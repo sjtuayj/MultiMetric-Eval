@@ -1,8 +1,51 @@
+Metadata-Version: 2.4
+Name: multimetriceval
+Version: 0.4.1
+Summary: 多指标评测工具: 支持翻译 (sacreBLEU/COMET/BLEURT/chrF++)，延迟（ATD,StartOffset）与 语音 (UTMOS/WER)
+Author-email: Yanjie An <691476922@qq.com>
+Project-URL: Homepage, https://github.com/sjtuayj/MultiMetric-Eval
+Project-URL: Bug Tracker, https://github.com/sjtuayj/MultiMetric-Eval/issues
+Project-URL: Documentation, https://github.com/sjtuayj/MultiMetric-Eval#readme
+Keywords: translation,evaluation,BLEU,COMET,BLEURT,NLP,ASR,speech-synthesis,voice-conversion,UTMOS,WER
+Classifier: Development Status :: 4 - Beta
+Classifier: Intended Audience :: Science/Research
+Classifier: Topic :: Scientific/Engineering :: Artificial Intelligence
+Classifier: License :: OSI Approved :: MIT License
+Classifier: Programming Language :: Python :: 3
+Classifier: Programming Language :: Python :: 3.8
+Classifier: Programming Language :: Python :: 3.9
+Classifier: Programming Language :: Python :: 3.10
+Classifier: Programming Language :: Python :: 3.11
+Requires-Python: >=3.8
+Description-Content-Type: text/markdown
+Requires-Dist: torch>=1.9.0
+Requires-Dist: torchaudio>=0.9.0
+Requires-Dist: numpy
+Requires-Dist: sacrebleu>=2.0.0
+Requires-Dist: pandas
+Requires-Dist: jiwer
+Requires-Dist: tqdm
+Requires-Dist: scipy
+Requires-Dist: soundfile
+Requires-Dist: textgrid
+Provides-Extra: comet
+Requires-Dist: unbabel-comet>=2.2.2; extra == "comet"
+Provides-Extra: whisper
+Requires-Dist: openai-whisper; extra == "whisper"
+Provides-Extra: viz
+Requires-Dist: matplotlib; extra == "viz"
+Provides-Extra: speech-full
+Requires-Dist: openai-whisper; extra == "speech-full"
+Provides-Extra: all
+Requires-Dist: unbabel-comet>=2.2.2; extra == "all"
+Requires-Dist: openai-whisper; extra == "all"
+Requires-Dist: matplotlib; extra == "all"
+
 # 📊 MultiMetric-Eval
 
 **全能型评测工具箱**：一套工具，同时满足 **机器翻译 (MT)**、**语音识别 (ASR)**、**语音合成 (TTS)**、**同声传译 (SimulST)** 与 **变声 (VC)** 的评测需求。
 
-[![PyPI version](https://badge.fury.io/py/multimetriceval.svg)](https://pypi.org/project/multimetriceval/0.4.2/)
+[![PyPI version](https://badge.fury.io/py/multimetriceval.svg)](https://pypi.org/project/multimetriceval/0.4.0/)
 [![Python 3.8+](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
@@ -262,43 +305,7 @@ UTMOS 依赖 GitHub 源码加载。
 1.  下载权重文件（如 [medium.pt](https://openaipublic.azureedge.net/main/whisper/models/345ae4da62f9b3d59415adc6017195dc-medium.pt)）。
 2.  放入文件夹（例如 `/path/to/whisper_weights/`）。
 
-
-### 3. 准备 MFA (针对同传评测)
-`LatencyEvaluator` 的 S2S 任务需要 MFA 进行强制对齐。由于 MFA 依赖较多，离线安装推荐使用 **Conda Pack** 方法。
-
-**步骤 A: 在联网机器上打包环境**
-```bash
-# 1. 创建并激活新环境
-conda create -n mfa_env python=3.9
-conda activate mfa_env
-
-# 2. 安装 MFA
-conda install -c conda-forge montreal-forced-aligner
-pip install conda-pack
-
-# 3. 下载必要模型 (重要: 必须在联网时下载，否则离线无法使用)
-mfa model download dictionary english_mfa
-mfa model download acoustic english_mfa
-
-# 4. 打包环境
-conda pack -n mfa_env -o mfa_env_packed.tar.gz
-```
-
-**步骤 B: 在离线机器上解压使用**
-```bash
-# 1. 传输并解压
-mkdir -p mfa_env
-tar -xzf mfa_env_packed.tar.gz -C mfa_env
-
-# 2. 激活环境
-source mfa_env/bin/activate
-
-# 3. 运行评测
-python -m multimetriceval.latency.cli ...
-```
-
-
-### 4. 代码调用
+### 3. 代码调用
 
 通过参数显式指定路径，**无需**将文件放入系统缓存目录。
 
@@ -314,7 +321,7 @@ evaluator = SpeechEvaluator(
 )
 ```
 
-### 5. 命令行调用 (CLI)
+### 4. 命令行调用 (CLI)
 
 ```bash
 python -m multimetriceval.speech_evaluator \
