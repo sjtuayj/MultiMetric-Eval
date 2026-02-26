@@ -67,59 +67,78 @@ pip install git+https://github.com/lucadiliello/bleurt-pytorch.git
 
 ---
 
-## 📖 模块一：翻译评测 (`TranslationEvaluator`)
-用于评估翻译质量或语音识别的语义准确性。
 
-### 快速开始
+## 📖 模块一：翻译评测 (`TranslationEvaluator`)
+用于多维度评估机器翻译质量或语音翻译的语义准确性（支持 BLEU, chrF++, COMET, BLEURT 等指标）。
+
+### ⚡ 快速开始
 
 ```python
 from multimetriceval import TranslationEvaluator
 
-# 初始化 (首次会自动下载模型)
+# 初始化 (首次运行会自动下载模型权重)
 evaluator = TranslationEvaluator(use_comet=True)
 
-# 评测
+# 基础评测 (直接传入文本列表)
 results = evaluator.evaluate(
-    hypothesis=["The cat sits on the mat."],
-    reference=["The cat is sitting on the mat."],
-    source=["猫坐在垫子上。"]
+    target_text=["The cat sits on the mat."],  # 你的翻译结果
+    reference=["The cat is sitting on the mat."], # 参考译文
+    source=["猫坐在垫子上。"]  # 源文本 (COMET 指标需要)
 )
 
 print(results)
 # Output: {'sacreBLEU': 45.2, 'chrF++': 62.1, 'COMET': 0.85}
 ```
 
-### 三种输入模式
+### 🛠️ 三种输入模式 (统一使用 `evaluate` 接口)
 
-#### 1. 纯文本评测
+现在的 `evaluate` 方法非常智能，支持混合输入不同类型的数据。
+
+#### 1. 纯文本评测 (列表或文件)
+你可以直接传入字符串列表，**或者直接传入文件路径**（支持 `.txt` 或 `.json`）。
+
 ```python
-results = evaluator.evaluate_all(
-    reference=["Reference translation."],
-    source=["源文本。"],
+# 方式 A: 传入文件路径 (推荐)
+results = evaluator.evaluate(
+    target_text="./outputs/model_prediction.txt",  # 自动读取文件
+    reference=["Reference translation 1", ...],
+    source=["源文本 1", ...]
+)
+
+# 方式 B: 传入内存中的列表
+results = evaluator.evaluate(
     target_text=["My translation."],
+    reference=["Reference translation."],
+    source=["源文本。"]
 )
 ```
 
-#### 2. 纯语音评测 (ASR模式)
-评估语音翻译模型的输出：
+#### 2. 纯语音评测 (ASR 模式)
+评估语音翻译模型（Speech-to-Text）的语义准确性。工具会自动调用 Whisper 将语音转录为文本，然后与参考译文计算 BLEU/COMET。
+
 ```python
+# 初始化时需启用 Whisper
 evaluator = TranslationEvaluator(use_comet=True, use_whisper=True)
 
-results = evaluator.evaluate_all(
+results = evaluator.evaluate(
+    target_speech="./my_audio_folder/",  # 传入音频文件夹路径
     reference=["Reference translation."],
-    source=["源文本。"],
-    target_speech="./my_audio_folder/",  # 自动转录后对比语义
+    source=["源文本。"]
 )
+# 返回结果包含: sacreBLEU_ASR, COMET_ASR 等后缀指标
 ```
 
-#### 3. 双模式评测
-同时评估文本翻译和语音翻译的一致性：
+#### 3. 双模式评测 (文本 + 语音)
+同时评估“文本翻译”和“语音翻译”的质量，常用于端到端语音翻译系统（Speech-to-Speech Translation）。
+
 ```python
-results = evaluator.evaluate_all(
-    reference=["Ref"], source=["Src"],
-    target_text=["Trans text"],
-    target_speech="./audio/"
+results = evaluator.evaluate(
+    reference=["Ref"], 
+    source=["Src"],
+    target_text="./outputs/text_predictions.txt", # 文本结果文件
+    target_speech="./outputs/audio_predictions/"  # 语音结果文件夹
 )
+# 返回结果将同时包含文本指标 (无后缀) 和语音指标 (_ASR 后缀)
 ```
 
 ---

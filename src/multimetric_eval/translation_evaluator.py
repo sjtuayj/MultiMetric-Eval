@@ -39,12 +39,15 @@ except ImportError:
 
 # ==================== 输入加载工具 ====================
 
-def load_hypothesis_from_file(file_path: str) -> List[str]:
+def load_target_text_from_file(file_path: str) -> List[str]:
     """
-    从文件加载用户翻译结果
+    从文件加载翻译结果 (target_text)
     
     支持格式:
-    - .json: {"hypothesis": [...]} 或 [{"id": "x", "hypothesis": "..."}, ...]
+    - .json: 
+        1. {"target_text": [...]}  (推荐)
+        2. {"hypothesis": [...]}   (兼容旧格式)
+        3. [{"target_text": "..."}, ...]
     - .txt: 每行一句
     """
     path = Path(file_path)
@@ -58,16 +61,33 @@ def load_hypothesis_from_file(file_path: str) -> List[str]:
         with open(path, "r", encoding="utf-8") as f:
             data = json.load(f)
         
-        if isinstance(data, dict) and "hypothesis" in data:
-            return data["hypothesis"]
+        # 情况 1: 根目录是字典 (Dict)
+        if isinstance(data, dict):
+            # 优先找新名字
+            if "target_text" in data:
+                return data["target_text"]
+            # 兼容旧名字
+            if "hypothesis" in data:
+                return data["hypothesis"]
+            raise ValueError("JSON 中未找到 'target_text' 或 'hypothesis' 字段")
         
+        # 情况 2: 根目录是列表 (List)
         if isinstance(data, list) and len(data) > 0:
-            if isinstance(data[0], dict) and "hypothesis" in data[0]:
-                return [item["hypothesis"] for item in data]
-            if isinstance(data[0], str):
+            first_item = data[0]
+            
+            # 子项是字典: [{"target_text": "..."}]
+            if isinstance(first_item, dict):
+                if "target_text" in first_item:
+                    return [item["target_text"] for item in data]
+                if "hypothesis" in first_item:
+                    return [item["hypothesis"] for item in data]
+                raise ValueError("JSON 列表项中未找到 'target_text' 或 'hypothesis' 键")
+            
+            # 子项是字符串: ["你好", "世界"]
+            if isinstance(first_item, str):
                 return data
-        
-        raise ValueError("JSON 格式不正确")
+            
+        raise ValueError("JSON 格式无法解析或为空")
     
     elif suffix == ".txt":
         with open(path, "r", encoding="utf-8") as f:
@@ -104,17 +124,9 @@ DEFAULT_BLEURT_MODEL = "lucadiliello/BLEURT-20"
 class TranslationEvaluator:
     """多指标翻译评测器"""
 
-    def __init__(
-        self,
-        use_comet: bool = True,
-        use_bleurt: bool = False,
-        use_whisper: bool = False,
-        comet_model: str = "Unbabel/wmt22-comet-da",
-        whisper_model: str = "medium",
-        bleurt_path: Optional[str] = None,
-        bleurt_model: Optional[str] = None,
-        device: Optional[str] = None,
-    ):
+    def __init__(self, use_comet=True, use_bleurt=False, use_whisper=False, 
+                 comet_model="Unbabel/wmt22-comet-da", whisper_model="medium", 
+                 bleurt_path=None, bleurt_model=None, device=None):
         """
         Args:
             use_comet: 是否启用 COMET
@@ -306,37 +318,39 @@ class TranslationEvaluator:
 
     def _compute_metrics(
         self,
-        hypothesis: List[str],
+        target_text: List[str],  # <--- 改名了
         reference: List[str],
         source: Optional[List[str]] = None,
         suffix: str = "",
     ) -> Dict[str, float]:
-
+        """核心计算逻辑"""
         results = {}
 
+        # SacreBLEU (使用 target_text)
         results[f"sacreBLEU{suffix}"] = self._safe_calc(
-            lambda: sacrebleu.corpus_bleu(hypothesis, [reference]).score
+            lambda: sacrebleu.corpus_bleu(target_text, [reference]).score
         )
 
         results[f"chrF++{suffix}"] = self._safe_calc(
-            lambda: sacrebleu.corpus_chrf(hypothesis, [reference], word_order=2).score
+            lambda: sacrebleu.corpus_chrf(target_text, [reference], word_order=2).score
         )
 
+        # BLEURT (使用 target_text)
         if self.bleurt_model and self.bleurt_tokenizer:
             results[f"BLEURT{suffix}"] = self._safe_calc(
-                lambda: self._compute_bleurt(reference, hypothesis)
+                lambda: self._compute_bleurt(reference, target_text)
             )
 
+        # COMET (使用 target_text)
         if self.comet:
             if source:
-                data = [{"src": s, "mt": h, "ref": r} for s, h, r in zip(source, hypothesis, reference)]
-                # ===== 修复这一行 =====
+                # 注意这里字典的 key: "mt" 对应 target_text
+                data = [{"src": s, "mt": t, "ref": r} for s, t, r in zip(source, target_text, reference)]
                 gpus = 1 if self.device.startswith("cuda") else 0
                 results[f"COMET{suffix}"] = self._safe_calc(
                     lambda: self.comet.predict(data, batch_size=8, gpus=gpus).system_score
                 )
             else:
-                print(f"⚠️ COMET{suffix} 需要 source 参数")
                 results[f"COMET{suffix}"] = -1.0
 
         results = {k: round(v, 4) if v >= 0 else v for k, v in results.items()}
@@ -346,123 +360,67 @@ class TranslationEvaluator:
 
     def evaluate(
         self,
-        hypothesis: List[str],
         reference: List[str],
         source: Optional[List[str]] = None,
-    ) -> Dict[str, float]:
-        """
-        纯文本评测（不涉及 ASR）
-        
-        Args:
-            hypothesis: 用户翻译结果 (target_text)
-            reference: 参考译文
-            source: 源文本（COMET 需要）
-        
-        Returns:
-            {"sacreBLEU": ..., "chrF++": ..., "COMET": ..., "BLEURT": ...}
-        """
-        print("📊 计算文本指标...")
-        return self._compute_metrics(hypothesis, reference, source, suffix="")
-
-    def evaluate_file(
-        self,
-        hypothesis_file: str,
-        reference: List[str],
-        source: Optional[List[str]] = None,
-    ) -> Dict[str, float]:
-        """从文件加载翻译结果并评测"""
-        print(f"📂 加载翻译结果: {hypothesis_file}")
-        hypothesis = load_hypothesis_from_file(hypothesis_file)
-        print(f"   加载了 {len(hypothesis)} 条翻译")
-        return self.evaluate(hypothesis, reference, source)
-
-    def evaluate_audio_folder(
-        self,
-        audio_folder: str,
-        reference: List[str],
-        source: Optional[List[str]] = None,
-    ) -> Dict[str, Union[float, List[str]]]:
-        """从音频文件夹评测（纯 ASR 模式）"""
-        print(f"📂 加载音频文件夹: {audio_folder}")
-        audio_paths = load_audio_from_folder(audio_folder)
-        print(f"   找到 {len(audio_paths)} 个音频文件")
-        
-        hypothesis_asr = self.transcribe(audio_paths)
-        
-        print("📊 计算 ASR 指标...")
-        results = self._compute_metrics(hypothesis_asr, reference, source, suffix="_ASR")
-        results["hypothesis_ASR"] = hypothesis_asr
-        return results
-
-    def evaluate_all(
-        self,
-        reference: List[str],
-        source: Optional[List[str]] = None,
-        target_text: Optional[Union[List[str], str]] = None,
-        target_speech: Optional[str] = None,
+        target_text: Optional[Union[List[str], str]] = None, # <--- 改名了，支持 List 或 文件路径
+        target_speech: Optional[Union[List[str], str]] = None, # 支持 List 或 文件夹路径
     ) -> Dict[str, Union[float, List[str]]]:
         """
-        统一评测接口（支持自定义数据）
-        
-        支持三种模式:
-        1. 只传 target_text → 返回 sacreBLEU, chrF++, COMET, BLEURT
-        2. 只传 target_speech → 返回 sacreBLEU_ASR, chrF++_ASR, COMET_ASR, BLEURT_ASR, hypothesis_ASR
-        3. 同时传两者 → 返回全部指标
+        全能评测接口
         
         Args:
-            reference: 参考译文
-            source: 源文本（COMET 需要）
-            target_text: 文本翻译结果（List[str] 或文件路径）
-            target_speech: 音频文件夹路径
-        
-        Returns:
-            评测结果字典
+            reference: 参考译文列表
+            source: 源文本列表 (COMET 需要)
+            target_text: 翻译文本结果 (可以是 字符串列表 或 文件路径)
+            target_speech: 翻译音频结果 (可以是 文件夹路径 或 音频路径列表)
         """
         if target_text is None and target_speech is None:
             raise ValueError("请至少提供 target_text 或 target_speech 之一")
 
         results = {}
 
-        # ---- 文本评测 ----
+        # 1. 处理文本评测
         if target_text is not None:
+            # 自动判断是文件路径还是列表
             if isinstance(target_text, str):
                 print(f"📂 加载翻译文件: {target_text}")
-                hyp_text = load_hypothesis_from_file(target_text)
-                print(f"   加载了 {len(hyp_text)} 条翻译")
+                # 假设 load_target_text_from_file 已经重命名好了
+                final_text = load_target_text_from_file(target_text) 
             else:
-                hyp_text = target_text
+                final_text = target_text
 
-            assert len(hyp_text) == len(reference), \
-                f"target_text 数量 ({len(hyp_text)}) 与 reference 数量 ({len(reference)}) 不一致"
+            if len(final_text) != len(reference):
+                raise ValueError(f"文本数量不一致: target={len(final_text)}, ref={len(reference)}")
 
             print("📊 计算文本指标...")
-            text_results = self._compute_metrics(hyp_text, reference, source, suffix="")
-            results.update(text_results)
-            results["hypothesis_text"] = hyp_text
+            # 调用核心逻辑
+            metrics = self._compute_metrics(final_text, reference, source, suffix="")
+            results.update(metrics)
+            results["target_text"] = final_text # 返回内容方便查看
 
-        # ---- 语音评测 ----
+        # 2. 处理语音评测 (ASR)
         if target_speech is not None:
             if not self.whisper_model:
-                raise RuntimeError("使用 target_speech 需要设置 use_whisper=True")
+                raise RuntimeError("需开启 use_whisper=True")
+            
+            # 自动判断是文件夹还是列表
+            if isinstance(target_speech, str):
+                print(f"📂 加载音频文件夹: {target_speech}")
+                audio_paths = load_audio_from_folder(target_speech)
+            else:
+                audio_paths = target_speech
 
-            print(f"📂 加载音频文件夹: {target_speech}")
-            audio_paths = load_audio_from_folder(target_speech)
-            print(f"   找到 {len(audio_paths)} 个音频文件")
+            if len(audio_paths) != len(reference):
+                raise ValueError(f"音频数量不一致: audio={len(audio_paths)}, ref={len(reference)}")
 
-            assert len(audio_paths) == len(reference), \
-                f"音频文件数量 ({len(audio_paths)}) 与 reference 数量 ({len(reference)}) 不一致"
-
-            if target_text is not None:
-                hyp_text_len = len(hyp_text) if isinstance(target_text, list) else len(load_hypothesis_from_file(target_text))
-                assert len(audio_paths) == hyp_text_len, \
-                    f"target_text 数量 ({hyp_text_len}) 与 target_speech 数量 ({len(audio_paths)}) 不一致，同时输入时必须是同一批样本"
-
-            hyp_asr = self.transcribe(audio_paths)
+            # 转录
+            asr_text = self.transcribe(audio_paths)
 
             print("📊 计算 ASR 指标...")
-            asr_results = self._compute_metrics(hyp_asr, reference, source, suffix="_ASR")
-            results.update(asr_results)
-            results["hypothesis_ASR"] = hyp_asr
+            # 调用核心逻辑
+            asr_metrics = self._compute_metrics(asr_text, reference, source, suffix="_ASR")
+            results.update(asr_metrics)
+            results["target_text_ASR"] = asr_text # 统一命名
 
         return results
 
@@ -471,33 +429,9 @@ class TranslationEvaluator:
         dataset,
         target_text: Optional[Union[List[str], str]] = None,
         target_speech: Optional[str] = None,
-        hypothesis: Optional[Union[List[str], str]] = None,
-        audio_folder: Optional[str] = None,
     ) -> Dict[str, Union[float, List[str]]]:
-        """
-        使用数据集评测（支持同时输入文本和语音）
-        
-        支持三种模式:
-        1. 只传 target_text → 返回 sacreBLEU, chrF++, COMET, BLEURT
-        2. 只传 target_speech → 返回 sacreBLEU_ASR, chrF++_ASR, COMET_ASR, BLEURT_ASR
-        3. 同时传两者 → 返回全部指标
-        
-        Args:
-            dataset: Dataset 对象
-            target_text: 文本翻译结果（List[str] 或文件路径）
-            target_speech: 音频文件夹路径
-            hypothesis: [向后兼容] 等同于 target_text
-            audio_folder: [向后兼容] 等同于 target_speech
-        
-        Returns:
-            评测结果字典
-        """
-        if hypothesis is not None and target_text is None:
-            target_text = hypothesis
-        if audio_folder is not None and target_speech is None:
-            target_speech = audio_folder
-
-        return self.evaluate_all(
+        """Dataset 辅助接口"""
+        return self.evaluate(
             reference=dataset.reference_texts,
             source=dataset.source_texts,
             target_text=target_text,
