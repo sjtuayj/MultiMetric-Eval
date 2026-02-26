@@ -1,4 +1,4 @@
-from .evaluator import (
+from .translation_evaluator import (
     ModelEvaluator,
     load_hypothesis_from_file,
     load_audio_from_folder,

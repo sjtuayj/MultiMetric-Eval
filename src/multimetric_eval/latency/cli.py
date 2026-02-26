@@ -14,7 +14,7 @@ from .utils import submit_slurm, Visualizer
 
 # --- 引入兄弟模块 (紧耦合) ---
 # 注意：使用相对导入或包绝对导入
-from ..evaluator import ModelEvaluator
+from ..translation_evaluator import ModelEvaluator
 from ..speech_evaluator import SpeechEvaluator
 
 class LatencyEvaluator:
