@@ -1,5 +1,5 @@
 from .translation_evaluator import (
-    ModelEvaluator,
+    TranslationEvaluator,
     load_hypothesis_from_file,
     load_audio_from_folder,
 )
@@ -20,7 +20,7 @@ __version__ = "0.4.1"
 
 __all__ = [
     # 核心评测器
-    "ModelEvaluator",      # 翻译/语义评测 (BLEU, COMET, etc.)
+    "TranslationEvaluator",      # 翻译/语义评测 (BLEU, COMET, etc.)
     "SpeechEvaluator",     # 语音质量评测 (UTMOS, WER)
     "LatencyEvaluator",
     "GenericAgent",

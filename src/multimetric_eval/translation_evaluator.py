@@ -101,7 +101,7 @@ def load_audio_from_folder(folder_path: str, extensions: tuple = (".wav", ".mp3"
 # BLEURT 默认模型（用于在线下载）
 DEFAULT_BLEURT_MODEL = "lucadiliello/BLEURT-20"
 
-class ModelEvaluator:
+class TranslationEvaluator:
     """多指标翻译评测器"""
 
     def __init__(

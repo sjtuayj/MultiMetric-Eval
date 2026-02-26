@@ -10,7 +10,7 @@
 
 本工具包含三个独立的评测模块，按需导入：
 
-1.  **`ModelEvaluator` (翻译与语义评测)**
+1.  **`TranslationEvaluator` (翻译与语义评测)**
     *   **场景**: 机器翻译、语音翻译 (ST)、ASR。
     *   **指标**: BLEU, chrF++, COMET, BLEURT。
     *   **特点**: 关注语义一致性，支持文本和语音输入。
@@ -26,7 +26,7 @@
     *   **特点**:
         *   支持 **计算感知 (Computation Aware)** 延迟。
         *   支持 **MFA 强制对齐**，实现精确的 S2S 延迟测量。
-        *   **一键集成质量评测** (自动调用 ModelEvaluator/SpeechEvaluator)。
+        *   **一键集成质量评测** (自动调用 TranslationEvaluator/SpeechEvaluator)。
 
 ---
 
@@ -67,16 +67,16 @@ pip install git+https://github.com/lucadiliello/bleurt-pytorch.git
 
 ---
 
-## 📖 模块一：翻译评测 (`ModelEvaluator`)
+## 📖 模块一：翻译评测 (`TranslationEvaluator`)
 用于评估翻译质量或语音识别的语义准确性。
 
 ### 快速开始
 
 ```python
-from multimetriceval import ModelEvaluator
+from multimetriceval import TranslationEvaluator
 
 # 初始化 (首次会自动下载模型)
-evaluator = ModelEvaluator(use_comet=True)
+evaluator = TranslationEvaluator(use_comet=True)
 
 # 评测
 results = evaluator.evaluate(
@@ -103,7 +103,7 @@ results = evaluator.evaluate_all(
 #### 2. 纯语音评测 (ASR模式)
 评估语音翻译模型的输出：
 ```python
-evaluator = ModelEvaluator(use_comet=True, use_whisper=True)
+evaluator = TranslationEvaluator(use_comet=True, use_whisper=True)
 
 results = evaluator.evaluate_all(
     reference=["Reference translation."],
@@ -231,7 +231,7 @@ python -m multimetriceval.latency.cli \
 *   `--agent-class`: Agent 类名。
 *   `--task`: `s2t` 或 `s2s`。
 *   `--computation-aware`: 开启计算感知延迟（统计模型推理耗时）。
-*   `--quality`: **(推荐)** 跑完延迟后，自动调用 `ModelEvaluator` (S2T) 或 `SpeechEvaluator` (S2S) 计算 BLEU/WER/UTMOS。
+*   `--quality`: **(推荐)** 跑完延迟后，自动调用 `TranslationEvaluator` (S2T) 或 `SpeechEvaluator` (S2S) 计算 BLEU/WER/UTMOS。
 *   `--visualize`: 生成延迟阶梯图 (需安装 `[viz]`)。
 
 ### 3. S2S 进阶：MFA 强制对齐
@@ -356,7 +356,7 @@ os.environ["HF_ENDPOINT"] = "https://hf-mirror.com"
 
 | 模块 | 指标 | 全称 | 用途 | 备注 |
 | :--- | :--- | :--- | :--- | :--- |
-| **ModelEvaluator** | **BLEU** | Bilingual Evaluation Understudy | 翻译 n-gram 匹配度 | 传统指标 |
+| **TranslationEvaluator** | **BLEU** | Bilingual Evaluation Understudy | 翻译 n-gram 匹配度 | 传统指标 |
 | | **chrF++** | Character n-gram F-score | 字符级匹配度 | 适合形态丰富的语言 |
 | | **COMET** | Crosslingual Optimized Metric | 基于神经网络的语义相似度 | **推荐** |
 | | **BLEURT** | Bilingual Evaluation Understudy with Representations | 基于 BERT 的语义评分 | Google 出品 |

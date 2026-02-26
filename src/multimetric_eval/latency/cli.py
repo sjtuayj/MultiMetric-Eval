@@ -14,7 +14,7 @@ from .utils import submit_slurm, Visualizer
 
 # --- 引入兄弟模块 (紧耦合) ---
 # 注意：使用相对导入或包绝对导入
-from ..translation_evaluator import ModelEvaluator
+from ..translation_evaluator import TranslationEvaluator
 from ..speech_evaluator import SpeechEvaluator
 
 class LatencyEvaluator:
@@ -131,9 +131,9 @@ def main():
         predictions = [ins.get_prediction_content() for ins in instances.values()]
         
         if args.task == "s2t":
-            # 调用 ModelEvaluator 算 BLEU/COMET
+            # 调用 TranslationModule 算 BLEU/COMET
             # 默认只开 BLEU 以保证速度，用户可在代码里改
-            qual_eval = ModelEvaluator(use_comet=False, use_whisper=False)
+            qual_eval = TranslationEvaluator(use_comet=False, use_whisper=False)
             q_res = qual_eval.evaluate(predictions, ref, src)
             print(q_res)
             
