@@ -2,7 +2,7 @@
 
 **全能型评测工具箱**：一套工具，同时满足 **机器翻译 (MT)**、**语音识别 (ASR)**、**语音合成 (TTS)**、**同声传译 (SimulST)** 与 **变声 (VC)** 的评测需求。
 
-[![PyPI version](https://badge.fury.io/py/multimetriceval.svg)](https://pypi.org/project/multimetriceval/0.4.2/)
+[![PyPI version](https://badge.fury.io/py/multimetriceval.svg)](https://pypi.org/project/multimetriceval/0.4.4/)
 [![Python 3.8+](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 

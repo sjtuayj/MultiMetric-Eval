@@ -1,6 +1,6 @@
 from .translation_evaluator import (
     TranslationEvaluator,
-    load_hypothesis_from_file,
+    load_target_text_from_file,
     load_audio_from_folder,
 )
 from .dataset import (
@@ -16,7 +16,7 @@ from .latency.cli import LatencyEvaluator
 from .latency.agent import GenericAgent, AgentPipeline
 from .latency.basics import ReadAction, WriteAction
 
-__version__ = "0.4.1"
+__version__ = "0.4.4"
 
 __all__ = [
     # 核心评测器
@@ -28,7 +28,7 @@ __all__ = [
     "ReadAction", 
     "WriteAction",
     # 工具函数
-    "load_hypothesis_from_file",
+    "load_target_text_from_file",
     "load_audio_from_folder",
 
     # 数据集管理

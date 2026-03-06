@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "multimetriceval"
-version = "0.4.1"
+version = "0.4.4"
 description = "多指标评测工具: 支持翻译 (sacreBLEU/COMET/BLEURT/chrF++)，延迟（ATD,StartOffset）与 语音 (UTMOS/WER)"
 readme = "README.md"
 requires-python = ">=3.8"
