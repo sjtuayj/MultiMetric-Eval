@@ -17,9 +17,6 @@ matplotlib
 [comet]
 unbabel-comet>=2.2.2
 
-[speech_full]
-openai-whisper
-
 [viz]
 matplotlib
 

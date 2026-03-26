@@ -5,6 +5,7 @@ import sys
 import os
 from pathlib import Path
 from tqdm import tqdm
+from .utils import submit_slurm, Visualizer
 
 from .basics import ReadAction, WriteAction
 from .instance import SpeechToTextInstance, SpeechToSpeechInstance
@@ -15,7 +16,6 @@ from .utils import submit_slurm, Visualizer
 # --- 引入兄弟模块 (紧耦合) ---
 # 注意：使用相对导入或包绝对导入
 from ..translation_evaluator import TranslationEvaluator
-from ..speech_evaluator import SpeechEvaluator
 
 class LatencyEvaluator:
     """同传延迟与质量评测器"""
@@ -128,20 +128,42 @@ def main():
         print("\n--- Quality Metrics (Integrated) ---")
         
         # 收集预测结果
+        # 注意: 对于 s2s, instances[i].prediction 应该是音频文件路径
         predictions = [ins.get_prediction_content() for ins in instances.values()]
         
         if args.task == "s2t":
-            # 调用 TranslationEvaluator 算 BLEU/COMET
-            # 默认只开 BLEU 以保证速度，用户可在代码里改
-            qual_eval = TranslationEvaluator(use_comet=False, use_whisper=False)
-            q_res = qual_eval.evaluate(predictions, ref, src)
+            # [修改] 调用 TranslationEvaluator 算 BLEU
+            # 默认只开 BLEU 以保证速度
+            qual_eval = TranslationEvaluator(
+                use_bleu=True, 
+                use_chrf=False, 
+                use_comet=False, 
+                use_whisper=False
+            )
+            # 使用新的 evaluate_all 接口
+            q_res = qual_eval.evaluate_all(
+                target_text=predictions, 
+                reference=ref, 
+                source=src
+            )
             print(q_res)
             
         elif args.task == "s2s":
-            # 调用 SpeechEvaluator 算 UTMOS/WER
+            # [修改] 调用 TranslationEvaluator 替代原 SpeechEvaluator
+            # 开启语音相关功能: use_wer=True, use_whisper=True
             # predictions 是 wav 路径列表
-            speech_eval = SpeechEvaluator(whisper_model_name="tiny") # 用 tiny 快速出 WER
-            s_res = speech_eval.evaluate(predictions, ref)
+            speech_eval = TranslationEvaluator(
+                use_wer=True, 
+                use_whisper=True, 
+                whisper_model="tiny", # 用 tiny 快速出 WER
+                use_utmos=False       # 可选开启
+            )
+            # 使用 evaluate_all 接口传入 target_speech
+            s_res = speech_eval.evaluate_all(
+                target_speech=predictions, 
+                reference=ref,
+                source=src
+            )
             print(s_res)
 
 if __name__ == "__main__":

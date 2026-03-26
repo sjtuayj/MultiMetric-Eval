@@ -2,31 +2,69 @@
 
 **全能型评测工具箱**：一套工具，同时满足 **机器翻译 (MT)**、**语音识别 (ASR)**、**语音合成 (TTS)**、**同声传译 (SimulST)** 与 **变声 (VC)** 的评测需求。
 
-[![PyPI version](https://badge.fury.io/py/multimetriceval.svg)](https://pypi.org/project/multimetriceval/0.4.4/)
+[![PyPI version](https://badge.fury.io/py/multimetriceval.svg)](https://pypi.org/project/multimetriceval/0.6.0/)
 [![Python 3.8+](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
+## 🎯 适用范围与核心能力 (Capabilities)
+
+本工具不仅仅是一个计算器，它是一个**多模态 (Multimodal) 质量评测框架**。它不负责翻译，而是负责对 **“任意翻译/生成结果”** 进行标准化打分。
+
+### 1. 支持的任务方向 (Supported Tasks)
+
+无论你的模型是文本还是语音，只要有参考答案 (Reference)，本工具均可评测：
+
+| 任务类型 | 输入 -> 输出 | 关键指标 | 典型场景 |
+| :--- | :--- | :--- | :--- |
+| **机器翻译 (MT)** | 文本 -> 文本 | BLEU, chrF++, COMET, BLEURT | 文档翻译、聊天机器人 |
+| **语音识别 (ASR)** | 语音 -> 文本 | WER / CER | 会议记录、字幕生成 |
+| **语音合成 (TTS)** | 文本 -> 语音 | UTMOS (自然度), ASR-WER (可懂度) | 文本朗读、数字人 |
+| **语音翻译 (S2T)** | 语音 -> 文本 | BLEU, COMET, WER | 端到端语音翻译 |
+| **语音转语音 (S2S)**| 语音 -> 语音 | UTMOS, ASR-BLEU, ASR-COMET | 同声传译、变声器 |
+| **多模态情感保真度**| 音频(+文本) -> V-A 误差 | Arousal / Valence MSE | 同传多模态情感一致性评估 |
+
+### 2. 多语言支持 (Language Support)
+
+本工具针对不同语系进行了**深度优化**，解决了传统评测脚本在 CJK (中日韩) 语言上分数失真的痛点。
+
+*   **✅ 第一梯队：深度优化 (CJK)**
+    *   **语言**: **中文 (zh)**, **日语 (ja)**, **韩语 (ko)**
+    *   **特性**: 内置智能路由，自动调用 **Jieba / MeCab** 进行特定分词。
+    *   **优势**: 彻底解决 SacreBLEU 因无空格导致 BLEU=0 的问题；自动切换为 CER (字符错误率)。
+
+*   **✅ 第二梯队：标准支持 (印欧语系)**
+    *   **语言**: **英语 (en)**, **德语 (de)**, **法语 (fr)**, **西班牙语 (es)** 等。
+    *   **特性**: 使用国际标准的 `13a` 分词器，与 WMT 评测标准对齐。
+
+*   **✅ 第三梯队：广泛支持 (低资源语言)**
+    *   **语言**: 泰语、阿拉伯语、越南语等 100+ 种语言。
+    *   **特性**: 依托 **COMET** (语义模型) 和 **Whisper** (ASR模型) 的强大能力，支持绝大多数互联网语言的语义与语音评测。
+
+---
+
 ## 🌟 核心功能
 
-本工具包含三个独立的评测模块，按需导入：
+本工具包含三个核心评测模块：
 
-1.  **`TranslationEvaluator` (翻译与语义评测)**
-    *   **场景**: 机器翻译、语音翻译 (ST)、ASR。
-    *   **指标**: BLEU, chrF++, COMET, BLEURT。
-    *   **特点**: 关注语义一致性，支持文本和语音输入。
+1.  **`TranslationEvaluator` (全能评测器)**
+    *   **一站式解决方案**: 同时支持 **文本翻译** 和 **语音合成/转换** 的评测。
+    *   **文本指标**: BLEU, chrF++, COMET, BLEURT。
+    *   **语音指标**: UTMOS (自然度), WER/CER (识别准确率)。
+    *   **特点**: 智能判断输入类型（文本/语音），自动计算所有适用的指标。
 
-2.  **`SpeechEvaluator` (语音质量评测)**
-    *   **场景**: 语音合成 (TTS)、变声 (Voice Conversion)。
-    *   **指标**: UTMOS (自然度), WER/CER (识别准确率)。
-    *   **特点**: 关注声音听感自然度和发音准确性。
-
-3.  **`LatencyEvaluator` (同传延迟评测)**
+2.  **`LatencyEvaluator` (同传延迟评测)**
     *   **场景**: 同声传译 (S2T / S2S)。
     *   **指标**: StartOffset, ATD (Average Token Delay)。
     *   **特点**:
         *   支持 **计算感知 (Computation Aware)** 延迟。
         *   支持 **MFA 强制对齐**，实现精确的 S2S 延迟测量。
-        *   **一键集成质量评测** (自动调用 TranslationEvaluator/SpeechEvaluator)。
+        *   **一键集成质量评测** (自动调用 TranslationEvaluator)。
+
+3.  **`EmotionEvaluator` (多模态情感保真度评测器)**
+    *   **场景**: 跨文化同传/翻译情感一致性评测 (V-A Continuous Benchmark)。
+    *   **指标**: Arousal MSE, Valence MSE, Fused Euclidean Distance。
+    *   **特点**: 采用“连续音频极性 (Arousal) + 文本语义修正 (Valence)”的双流结构；支持断网加载本地多模态大模型以及内置 Whisper 回退。
+
 
 ---
 
@@ -35,7 +73,7 @@
 ### 1. 基础安装
 
 ```bash
-# 基础版 (仅支持文本指标 + UTMOS)
+# 基础版 (仅支持文本指标)
 pip install multimetriceval
 ```
 
@@ -44,14 +82,14 @@ pip install multimetriceval
 根据你需要使用的功能安装额外的库：
 
 ```bash
-# [模块一] 启用 COMET (翻译评测)
+# [文本] 启用 COMET (语义评测)
 pip install "multimetriceval[comet]"
 
-# [模块二] 启用 Whisper (语音评测 WER / ASR功能)
+# [语音] 启用 Whisper (ASR / WER / 语音转文本)
 # *注意: 需要系统已安装 ffmpeg
 pip install "multimetriceval[whisper]"
 
-# [模块三] 启用同传可视化 (Matplotlib)
+# [同传] 启用可视化 (Matplotlib)
 pip install "multimetriceval[viz]"
 
 # 安装所有功能 (推荐)
@@ -67,141 +105,173 @@ pip install git+https://github.com/lucadiliello/bleurt-pytorch.git
 
 ---
 
+## 📖 模块一：全能评测 (`TranslationEvaluator`)
 
-## 📖 模块一：翻译评测 (`TranslationEvaluator`)
-用于多维度评估机器翻译质量或语音翻译的语义准确性（支持 BLEU, chrF++, COMET, BLEURT 等指标）。
+这是本库的核心类，能够处理从纯文本到纯语音，以及混合模态的所有评测需求。
 
-### ⚡ 快速开始
+### ⚡ 初始化配置 (Switches)
+
+通过初始化参数，你可以精确控制要计算哪些指标：
 
 ```python
 from multimetriceval import TranslationEvaluator
 
-# 初始化 (首次运行会自动下载模型权重)
+evaluator = TranslationEvaluator(
+    # --- 文本指标开关 ---
+    use_bleu=True,      # 默认 True
+    use_chrf=True,      # 默认 True
+    use_comet=True,     # 默认 True (需安装 comnet)
+    use_bleurt=False,   # 默认 False (需手动安装)
+    
+    # --- 语音指标开关 ---
+    use_wer=True,       # 计算 WER/CER (需开启 whisper)
+    use_utmos=False,    # 计算自然度 UTMOS (需下载模型)
+    use_whisper=False,  # 启用 ASR 转写功能
+    
+    # --- 模型路径 (可选) ---
+    device="cuda"       # 自动检测，可手动指定
+)
+```
+### 📂 数据输入方式详解
+
+`evaluate_all` 方法非常灵活，支持 **内存变量 (List)** 和 **文件路径 (Path)** 混合输入。
+
+#### 1. 文本输入 (`target_text`&`reference` & `source`)
+支持直接传入 Python 列表，或传入文件路径（工具会自动读取）。
+一致性要求: 无论使用哪种方式，source 和 reference 的行数/条目数必须与评测目标严格对应。
+
+*   **格式 A: 纯文本文件 (.txt)**
+    *   要求：一行一句，数量必须与 `reference` 一致。
+    ```text
+    Hello world
+    This is a test
+    ```
+*   **格式 B: JSON 文件 (.json)**
+    *   支持三种结构，工具会自动识别：
+    1.  **字典 (推荐)**: `{"target_text": ["句1", "句2"]}` 或 `{"hypothesis": ["...", "..."]}`
+    2.  **列表-字典**: `[{"target_text": "句1"}, {"target_text": "句2"}]`
+    3.  **纯列表**: `["句1", "句2"]`
+
+#### 2. 语音输入 (`target_speech`)
+支持直接传入音频路径列表，或传入文件夹路径。
+
+*   **方式 A: 文件夹路径 (推荐)**
+    *   传入字符串路径：`"./audio_output/"`
+    *   **重要规则**：工具会自动读取该文件夹下所有 `.wav/.mp3/.flac` 文件，并**按文件名 (A-Z) 排序**。请确保排序后的音频与 `reference` 文本顺序一一对应。
+*   **方式 B: 文件路径列表**
+    *   传入 List：`["/data/1.wav", "/data/2.wav"]`
+
+
+---
+### 🛠️ 使用场景示例
+
+#### 场景 1: 纯文本机器翻译 (MT)
+计算 BLEU, chrF++, COMET。
+**注意：** 如果目标语言是中文 (`zh`) 或日语 (`ja`)，请务必指定 `target_lang`，工具会自动切换分词器 (jieba/mecab)。
+
+```python
 evaluator = TranslationEvaluator(use_comet=True)
 
-# 基础评测 (直接传入文本列表)
-results = evaluator.evaluate(
-    target_text=["The cat sits on the mat."],  # 你的翻译结果
-    reference=["The cat is sitting on the mat."], # 参考译文
-    source=["猫坐在垫子上。"]  # 源文本 (COMET 指标需要)
+# 示例：英日翻译 (English -> Japanese)
+results = evaluator.evaluate_all(
+    target_text=["猫はマットの上に座っている。"],  # 日语翻译结果
+    reference=["猫はマットの上に座っています。"], # 日语参考译文
+    source=["The cat sits on the mat."],       # 源文本
+    target_lang="ja"                           # <--- 关键！指定目标语言为日语
+)
+
+# 工具会自动调用 'ja-mecab' 分词，计算准确的 BLEU
+print(results)
+# {'sacreBLEU': 45.2, 'chrF++': 62.1, 'COMET': 0.85}
+```
+
+#### 场景 2: 语音合成 (TTS) / 变声 (VC)
+计算 **UTMOS (自然度)** 和 **WER/CER (准确率)**。
+*注意：计算 WER 需要开启 `use_whisper=True`。*
+
+```python
+# 初始化: 开启语音相关功能
+evaluator = TranslationEvaluator(
+    use_utmos=True, 
+    use_whisper=True, 
+    use_wer=True,
+    device="cuda"
+)
+
+results = evaluator.evaluate_all(
+    target_speech="./generated_audio_folder/",  # 音频文件夹
+    reference=["你好世界", "这是一个测试"],      # 对应的文本内容
+    target_lang="zh"                            # <--- 指定中文，影响 ASR 后计算的 BLEU 分词
 )
 
 print(results)
-# Output: {'sacreBLEU': 45.2, 'chrF++': 62.1, 'COMET': 0.85}
+# {
+#   'UTMOS': 4.15,          # 自然度得分
+#   'WER': 0.05,            # 字错误率 (中文自动转为 CER)
+#   'sacreBLEU_ASR': 98.5   # ASR文本与参考文本的 BLEU (自动使用 zh 分词)
+# }
 ```
 
-### 🛠️ 三种输入模式 (统一使用 `evaluate` 接口)
-
-现在的 `evaluate` 方法非常智能，支持混合输入不同类型的数据。
-
-#### 1. 纯文本评测 (列表或文件)
-你可以直接传入字符串列表，**或者直接传入文件路径**（支持 `.txt` 或 `.json`）。
+#### 场景 3: 语音翻译 (S2T / S2S) - 双模态评测
+同时评估 **“生成的文本”** 和 **“生成的语音”**。常用于端到端语音翻译系统。
 
 ```python
-# 方式 A: 传入文件路径 (推荐)
-results = evaluator.evaluate(
-    target_text="./outputs/model_prediction.txt",  # 自动读取文件
-    reference=["Reference translation 1", ...],
-    source=["源文本 1", ...]
-)
-
-# 方式 B: 传入内存中的列表
-results = evaluator.evaluate(
-    target_text=["My translation."],
-    reference=["Reference translation."],
-    source=["源文本。"]
-)
-```
-
-#### 2. 纯语音评测 (ASR 模式)
-评估语音翻译模型（Speech-to-Text）的语义准确性。工具会自动调用 Whisper 将语音转录为文本，然后与参考译文计算 BLEU/COMET。
-
-```python
-# 初始化时需启用 Whisper
-evaluator = TranslationEvaluator(use_comet=True, use_whisper=True)
-
-results = evaluator.evaluate(
-    target_speech="./my_audio_folder/",  # 传入音频文件夹路径
-    reference=["Reference translation."],
-    source=["源文本。"]
-)
-# 返回结果包含: sacreBLEU_ASR, COMET_ASR 等后缀指标
-```
-
-#### 3. 双模式评测 (文本 + 语音)
-同时评估“文本翻译”和“语音翻译”的质量，常用于端到端语音翻译系统（Speech-to-Speech Translation）。
-
-```python
-results = evaluator.evaluate(
-    reference=["Ref"], 
-    source=["Src"],
+results = evaluator.evaluate_all(
+    reference=["Ref sentence"], 
+    source=["Src sentence"],
     target_text="./outputs/text_predictions.txt", # 文本结果文件
     target_speech="./outputs/audio_predictions/"  # 语音结果文件夹
 )
-# 返回结果将同时包含文本指标 (无后缀) 和语音指标 (_ASR 后缀)
+
+# 返回结果将同时包含:
+# 1. 文本指标 (基于 target_text): sacreBLEU, COMET
+# 2. 语音指标 (基于 target_speech): UTMOS, WER, sacreBLEU_ASR, COMET_ASR
 ```
 
 ---
+## 🌍 多语言支持：解决 SacreBLEU 分词问题
 
-## 🎧 模块二：语音质量评测 (`SpeechEvaluator`)
-专为 **TTS (语音合成)** 和 **VC (变声)** 设计。
+在评测 **中文 (zh)**、**日语 (ja)** 或 **韩语 (ko)** 时，传统的 BLEU 算法（默认以空格分词）会导致评分严重失真（通常接近 0 分）。
 
-### ⚡️ 核心特性：WER/CER 智能适配
+本工具内置了**智能分词路由**，你只需在 `evaluate_all` 中传入 `target_lang` 参数，工具会自动处理底层细节：
+
+| 目标语言 | `target_lang` | 自动调用的 Tokenizer | 依赖库 |
+| :--- | :--- | :--- | :--- |
+| **日语** | `"ja"` | `ja-mecab` | `mecab-python3`, `ipadic` |
+| **中文** | `"zh"` | `zh` | `jieba` |
+| **韩语** | `"ko"` | `ko-mecab` | `mecab-ko` |
+| **英语/其他** | `"en"`, `"fr"`... | `13a` (默认) | 无 |
+
+**使用方式：**
+```python
+# 日语评测 (必须指定，否则 BLEU 极低)
+evaluator.evaluate_all(..., target_lang="ja")
+
+# 英语评测 (默认可不写，或写 "en")
+evaluator.evaluate_all(..., target_lang="en")
+```
+---
+
+## ⚡️ 语音评测核心特性
+
+### 1. WER/CER 智能适配
 本工具内置了智能分词逻辑：
 *   **英文/印欧语系**：保持空格分词，计算 **WER (Word Error Rate)**。
 *   **中文/日文**：自动在字符间插入空格，计算 **CER (Character Error Rate)**。
 *   **混合文本**：混合处理。
 > 无需用户手动分词，直接传入原始文本即可。
 
-### 快速开始
+### 2. ASR 后文本指标联动
+当 `use_whisper=True` 时，工具会计算 `sacreBLEU_ASR`。该指标同样受 `target_lang` 参数控制。例如设置 `target_lang="ja"`，不仅 WER 会按字符计算，`sacreBLEU_ASR` 也会自动使用 MeCab 分词。
 
-```python
-from multimetriceval import SpeechEvaluator
+### 3. 双轨制指标命名
+当同时传入文本和语音时，结果字典中的 key 遵循以下规则：
+*   **标准指标** (如 `sacreBLEU`, `COMET`): 基于 `target_text` 计算。
+*   **ASR 指标** (如 `sacreBLEU_ASR`, `COMET_ASR`): 先用 Whisper 将 `target_speech` 转写为文本，再基于转写结果计算。
 
-# 初始化 (自动加载 UTMOS 和 Whisper)
-evaluator = SpeechEvaluator(device="cuda")
-
-# 评测列表数据
-audio_paths = ["/data/gen_en.wav", "/data/gen_zh.wav"]
-ref_texts = ["Hello world", "你好世界"]
-
-results = evaluator.evaluate(audio_paths, ref_texts)
-print(results)
-# Output: 
-# {
-#   'UTMOS': 4.15,  # 自然度 (1-5分)
-#   'WER': 0.05     # 这里不仅包含英文WER，也包含中文CER
-# }
-```
-
-### 数据输入方式
-
-#### 方式 A: CSV 文件 (推荐)
-最适合批量评测，避免文件乱序问题。
-
-```csv
-wav_path,text
-/exp/tts/001.wav,Hello world
-/exp/tts/002.wav,你好世界
-```
-
-```python
-results = evaluator.evaluate_from_csv("data.csv", wav_col="wav_path", text_col="text")
-```
-
-#### 方式 B: 文件夹 + 文本文件
-适用于生成了一堆 wav 文件，且有一个对应的 txt 文件。
-*注意：音频文件将按文件名排序后与文本行对应。*
-
-```python
-results = evaluator.evaluate_from_folder(
-    audio_folder="./outputs", 
-    text_file="./scripts.txt"
-)
-```
 ---
 
-## ⏱️ 模块三：同传延迟评测 (`LatencyEvaluator`)
+## ⏱️ 模块二：同传延迟评测 (`LatencyEvaluator`)
 
 专为 **Simultaneous Translation (同声传译)** 任务设计，支持 S2T (Speech-to-Text) 和 S2S (Speech-to-Speech)。
 
@@ -250,7 +320,7 @@ python -m multimetriceval.latency.cli \
 *   `--agent-class`: Agent 类名。
 *   `--task`: `s2t` 或 `s2s`。
 *   `--computation-aware`: 开启计算感知延迟（统计模型推理耗时）。
-*   `--quality`: **(推荐)** 跑完延迟后，自动调用 `TranslationEvaluator` (S2T) 或 `SpeechEvaluator` (S2S) 计算 BLEU/WER/UTMOS。
+*   `--quality`: **(推荐)** 跑完延迟后，自动调用 `TranslationEvaluator` 计算质量指标。
 *   `--visualize`: 生成延迟阶梯图 (需安装 `[viz]`)。
 
 ### 3. S2S 进阶：MFA 强制对齐
@@ -265,10 +335,77 @@ python -m multimetriceval.latency.cli \
 只需在运行 S2S 任务时，脚本会自动检测 MFA 环境。如果环境就绪，会自动计算额外的对齐指标：
 *   `StartOffset_SpeechAlign`
 *   `ATD_SpeechAlign`
+---
+
+## 🎭 模块三：多模态情感保真度评测 (`EmotionEvaluator`)
+
+专为 **同传 / 翻译情感保留度 (Multimodal Emotion Fidelity)** 任务设计，基于业界前沿的 **V-A (Valence-Arousal)** 连续维度标准。通过比较源语言音文本与目标语言音文本的情感距离（Distance），客观衡量生成质量。
+
+### 1. 初始化
+
+默认会自动从 HuggingFace 加载三个组件：Audeering 声学模型、XLM-RoBERTa 文本模型 和 Whisper。支持彻底离线断网加载。
+
+```python
+from multimetriceval import EmotionEvaluator
+
+# 初始化评测器，如果在无网环境，可显式指定本地文件夹路径
+evaluator = EmotionEvaluator(
+    audio_model_path="audeering/wav2vec2-large-robust-12-ft-emotion-msp-dim", # 或指向本地目录
+    text_model_path="cardiffnlp/twitter-xlm-roberta-base-sentiment",          # 或指向本地目录
+    whisper_model_path="large-v3",                                            # 如果没有文本则用于兜底
+    device="cuda"
+)
+```
+
+### 2. 数据准备与评测
+
+系统需要比对 Source（源音频） 和 Target（目标音频）。您可以选择是否传入已转写好的文本。
+
+```python
+results = evaluator.evaluate_all(
+    source_audio="./data/src_wavs/",  # 源语言音频
+    target_audio="./data/tgt_wavs/",  # 同传/翻译目标音频
+    # source_text="./data/src_texts.txt",  # [可选] 如果不传则内置 Whisper 进行 ASR 转写
+    # target_text="./data/tgt_texts.txt",  # [可选] 如果不传则内置 Whisper 进行 ASR 转写
+    verbose=True
+)
+
+print(results)
+# {
+#   'Audio_Arousal_Distance_MSE': 0.0152,       # 声学唤醒度误差 (越小越好)
+#   'Text_Valence_Distance_MSE': 0.0315,        # 语义侧效价误差 (越小越好)
+#   'Final_Fused_Distance_Euclidean': 0.1751    # 综合特征融合欧氏距离 (越小越好)
+# }
+```
+
+### 3. JSON 数据格式支持
+
+如果你的数据存储在 JSON 中，工具也能智能解析：
+
+```python
+# data.json 示例:
+# [{"audio": "path/to/1.wav", "label": "happy"}, ...]
+
+results = evaluator.evaluate_all(
+    source_audio=["src1.wav", "src2.wav"],
+    target_audio="target_data_config.json"
+)
+```
+
+<!-- ### 4. 自定义标签映射 (可选)
+
+如果你的标签体系与模型不一致，可以传入映射表：
+
+```python
+# 假设你的标签是 "0, 1, 2"，模型标签是 "neutral, happy, sad"
+label_map = {"0": "neutral", "1": "happy", "2": "sad"}
+
+evaluator = EmotionEvaluator(use_ser=True, custom_label_map=label_map)
+``` -->
 
 ---
 
-## 🛡️ 离线 / 内网环境使用指南 (SpeechEvaluator)
+## 🛡️ 离线 / 内网环境使用指南 (语音模型)
 
 如果在无法连接 GitHub 或 HuggingFace 的服务器（如校园网 HPC）上使用，请按以下步骤操作。
 
@@ -281,66 +418,47 @@ UTMOS 依赖 GitHub 源码加载。
 1.  下载权重文件（如 [medium.pt](https://openaipublic.azureedge.net/main/whisper/models/345ae4da62f9b3d59415adc6017195dc-medium.pt)）。
 2.  放入文件夹（例如 `/path/to/whisper_weights/`）。
 
-
-### 3. 准备 MFA (针对同传评测)
-`LatencyEvaluator` 的 S2S 任务需要 MFA 进行强制对齐。由于 MFA 依赖较多，离线安装推荐使用 **Conda Pack** 方法。
-
-**步骤 A: 在联网机器上打包环境**
-```bash
-# 1. 创建并激活新环境
-conda create -n mfa_env python=3.9
-conda activate mfa_env
-
-# 2. 安装 MFA
-conda install -c conda-forge montreal-forced-aligner
-pip install conda-pack
-
-# 3. 下载必要模型 (重要: 必须在联网时下载，否则离线无法使用)
-mfa model download dictionary english_mfa
-mfa model download acoustic english_mfa
-
-# 4. 打包环境
-conda pack -n mfa_env -o mfa_env_packed.tar.gz
-```
-
-**步骤 B: 在离线机器上解压使用**
-```bash
-# 1. 传输并解压
-mkdir -p mfa_env
-tar -xzf mfa_env_packed.tar.gz -C mfa_env
-
-# 2. 激活环境
-source mfa_env/bin/activate
-
-# 3. 运行评测
-python -m multimetriceval.latency.cli ...
-```
-
-
-### 4. 代码调用
+### 3. 代码调用
 
 通过参数显式指定路径，**无需**将文件放入系统缓存目录。
 
 ```python
-evaluator = SpeechEvaluator(
-    device="cuda",
+evaluator = TranslationEvaluator(
+    use_utmos=True,
+    use_whisper=True,
     # [新增] 指定本地源码路径
     utmos_model_path="/path/to/SpeechMOS-main",
     # [新增] 指定本地权重路径 (.pth)
     utmos_ckpt_path="/path/to/utmos22_strong.pth", 
-    # 指定 Whisper 权重目录
-    whisper_root="/path/to/whisper_weights/"
+    # 指定 Whisper 权重文件路径 (注意这里要带上 .pt 文件名或确保 load_model 能找到)
+    whisper_model="medium", 
+    # 或者通过环境变量控制 whisper 缓存路径
 )
 ```
+*(注：Whisper 的 `load_model` 的 `download_root` 参数在 `TranslationEvaluator` 内部目前使用的是默认缓存或 `~/.cache/whisper`，如需完全离线指定路径，建议提前设置环境变量或将模型放入默认缓存目录)*
 
-### 5. 命令行调用 (CLI)
+### 4. 准备 Emotion (多模态情感) 模型
 
-```bash
-python -m multimetriceval.speech_evaluator \
-    --csv data.csv \
-    --utmos_path /path/to/SpeechMOS-main \
-    --utmos_ckpt /path/to/utmos22_strong.pth \
-    --whisper_root /path/to/whisper_weights
+EmotionEvaluator 使用标准的 HuggingFace `transformers` 库加载声学与文本模型，以及 OpenAI 的 `whisper` 库。
+
+1. 下载 `audeering/...` 模型和 `twitter-xlm-roberta-...` 模型的本地文件夹。
+
+2. 在初始化时通过路径指定。
+
+
+
+```python
+
+evaluator = EmotionEvaluator(
+
+    audio_model_path="/path/to/local/audeering_wav2vec2",
+
+    text_model_path="/path/to/local/xlm_roberta",
+
+    whisper_model_path="/path/to/local/whisper_medium.pt"
+
+)
+
 ```
 
 ---
@@ -352,10 +470,10 @@ python -m multimetriceval.speech_evaluator \
 
 ```python
 # 指定第 0 号 GPU
-evaluator = SpeechEvaluator(device="cuda:0")
+evaluator = TranslationEvaluator(device="cuda:0")
 
 # 强制使用 CPU
-evaluator = SpeechEvaluator(device="cpu")
+evaluator = TranslationEvaluator(device="cpu")
 ```
 
 或者使用环境变量：
@@ -375,15 +493,17 @@ os.environ["HF_ENDPOINT"] = "https://hf-mirror.com"
 
 | 模块 | 指标 | 全称 | 用途 | 备注 |
 | :--- | :--- | :--- | :--- | :--- |
-| **TranslationEvaluator** | **BLEU** | Bilingual Evaluation Understudy | 翻译 n-gram 匹配度 | 传统指标 |
+| **TranslationEvaluator** | **sacreBLEU** | Bilingual Evaluation Understudy | 翻译 n-gram 匹配度 | 传统指标 |
 | | **chrF++** | Character n-gram F-score | 字符级匹配度 | 适合形态丰富的语言 |
 | | **COMET** | Crosslingual Optimized Metric | 基于神经网络的语义相似度 | **推荐** |
 | | **BLEURT** | Bilingual Evaluation Understudy with Representations | 基于 BERT 的语义评分 | Google 出品 |
-| **SpeechEvaluator**| **UTMOS** | UTMOS22 Strong | 语音自然度/MOS 预测 | 无需参考音频 |
+| | **UTMOS** | UTMOS22 Strong | 语音自然度/MOS 预测 | 无需参考音频 |
 | | **WER/CER** | Word/Character Error Rate | 识别准确率 | **自动适配中英文** |
 | **LatencyEvaluator**| **StartOffset** | Start Offset | 首字/首音延迟 | 反应速度 |
 | | **ATD** | Average Token Delay | 平均 Token 延迟 | 综合延迟指标 |
-| | **(Custom)** | Custom ATD | 在ATD基础上除去音频播放时长 | 支持扩展 |
+| **EmotionEvaluator**| **Audio Arousal Dist**| Audio Arousal Distance MSE | 声学唤醒度误差 | 基于 Audeering 模型提取 |
+| | **Text Valence Dist**| Text Valence Distance MSE | 语义级极性误差 | 基于 XLM-R 情感极性提取 |
+| | **Fused Euclidean**| Final Fused Euclidean Distance | 多模态联合评定分数 | 距离越小，情感保真度越高 |
 
 ---
 
@@ -408,6 +528,9 @@ A: 请运行 `pip install "multimetriceval[viz]"` 安装可视化依赖。
 
 **Q: S2S 任务中 `ATD_SpeechAlign` 没有结果？**
 A: 这通常是因为未安装 MFA 或未下载 MFA 模型。请参考模块三文档安装 `montreal-forced-aligner`。如果未安装，工具会自动跳过对齐指标，仅计算基础切片延迟。
+
+**Q: 评测日语时提示 `ModuleNotFoundError: No module named 'MeCab'`？**
+A: 评测日语 BLEU 需要依赖 MeCab。请运行 `pip install mecab-python3 ipadic` 安装所需依赖。同理，中文评测需要 `pip install jieba`。
 
 **Q: 如何在 Python 代码中手动调用同传评测？**
 ```python
