@@ -8,17 +8,25 @@ tqdm
 scipy
 soundfile
 textgrid
+transformers
+matplotlib
 
 [all]
 unbabel-comet>=2.2.2
 openai-whisper
-matplotlib
+funasr
+modelscope
+librosa
 
 [comet]
 unbabel-comet>=2.2.2
 
-[viz]
-matplotlib
+[emotion]
+funasr
+modelscope
+
+[paralinguistics]
+librosa
 
 [whisper]
 openai-whisper

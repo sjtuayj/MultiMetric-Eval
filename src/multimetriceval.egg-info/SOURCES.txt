@@ -3,6 +3,7 @@ pyproject.toml
 src/multimetric_eval/__init__.py
 src/multimetric_eval/dataset.py
 src/multimetric_eval/emotion_evaluator.py
+src/multimetric_eval/paralinguistic_evaluator.py
 src/multimetric_eval/translation_evaluator.py
 src/multimetric_eval/latency/__init__.py
 src/multimetric_eval/latency/agent.py
@@ -16,3 +17,4 @@ src/multimetriceval.egg-info/SOURCES.txt
 src/multimetriceval.egg-info/dependency_links.txt
 src/multimetriceval.egg-info/requires.txt
 src/multimetriceval.egg-info/top_level.txt
+test/test_paralinguistic.py

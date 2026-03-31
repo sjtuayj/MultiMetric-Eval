@@ -2,7 +2,7 @@
 
 **全能型评测工具箱**：一套工具，同时满足 **机器翻译 (MT)**、**语音识别 (ASR)**、**语音合成 (TTS)**、**同声传译 (SimulST)** 与 **变声 (VC)** 的评测需求。
 
-[![PyPI version](https://badge.fury.io/py/multimetriceval.svg)](https://pypi.org/project/multimetriceval/0.6.0/)
+[![PyPI version](https://badge.fury.io/py/multimetriceval.svg)](https://pypi.org/project/multimetriceval/0.7.0/)
 [![Python 3.8+](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
@@ -21,7 +21,8 @@
 | **语音合成 (TTS)** | 文本 -> 语音 | UTMOS (自然度), ASR-WER (可懂度) | 文本朗读、数字人 |
 | **语音翻译 (S2T)** | 语音 -> 文本 | BLEU, COMET, WER | 端到端语音翻译 |
 | **语音转语音 (S2S)**| 语音 -> 语音 | UTMOS, ASR-BLEU, ASR-COMET | 同声传译、变声器 |
-| **多模态情感保真度**| 音频(+文本) -> V-A 误差 | Arousal / Valence MSE | 同传多模态情感一致性评估 |
+| **跨语种情感保真度**| 音频 -> 离散/连续差距 | Fidelity (Cosine) / Accuracy | 同传、变声情感保留度测试 |
+| **副语言/声学事件保留 (<ins>New!</ins>)**| 音频 -> 音频 | Paralinguistic Fidelity / Event F1 | 翻译/变声中的笑声、咳嗽等非语言声音保留度测试 |
 
 ### 2. 多语言支持 (Language Support)
 
@@ -44,7 +45,7 @@
 
 ## 🌟 核心功能
 
-本工具包含三个核心评测模块：
+本工具包含四个核心评测模块：
 
 1.  **`TranslationEvaluator` (全能评测器)**
     *   **一站式解决方案**: 同时支持 **文本翻译** 和 **语音合成/转换** 的评测。
@@ -60,10 +61,16 @@
         *   支持 **MFA 强制对齐**，实现精确的 S2S 延迟测量。
         *   **一键集成质量评测** (自动调用 TranslationEvaluator)。
 
-3.  **`EmotionEvaluator` (多模态情感保真度评测器)**
-    *   **场景**: 跨文化同传/翻译情感一致性评测 (V-A Continuous Benchmark)。
-    *   **指标**: Arousal MSE, Valence MSE, Fused Euclidean Distance。
-    *   **特点**: 采用“连续音频极性 (Arousal) + 文本语义修正 (Valence)”的双流结构；支持断网加载本地多模态大模型以及内置 Whisper 回退。
+3.  **`EmotionEvaluator` (基于大模型特征的情感保真度评测器)**
+    *   **场景**: S2ST (语音到语音翻译)、变声等跨文化/跨语种声音情感保留一致性评测。
+    *   **指标**: 
+        *   **Emotion Fidelity (Cosine Similarity)**: 基于 Emotion2Vec+ 提取的 768-d 高维嵌入特征，计算原音频和目标音频的情感保留余弦相似度。
+        *   **Emotion Recognition Accuracy**: 将模型用作 Zero-shot 分类器，评测生成声音情感与参考标签的一致率。
+    *   **特点**: 完全基于开源前沿声音情感大模型 `iic/emotion2vec_plus_large`，鲁棒应对多种语种发音。
+
+4.  **`ParalinguisticEvaluator` (副语言与声学事件评测器)**  <mark>🆕 新增</mark>
+    *   **场景**: 跨语种 S2ST 或变声任务中，评估模型在生成目标语音时，能否较好地**保留原音频中存在的物理发声（如叹气、咳嗽、笑声、重呼吸等环境声学事件）**。
+    *   **特点**: 利用多模态 CLAP 模型的声学空间表征及零样本 (Zero-Shot) 跨模态比对能力，实现纯客观盲测。
 
 
 ---
@@ -86,15 +93,18 @@ pip install multimetriceval
 pip install "multimetriceval[comet]"
 
 # [语音] 启用 Whisper (ASR / WER / 语音转文本)
-# *注意: 需要系统已安装 ffmpeg
 pip install "multimetriceval[whisper]"
 
-# [同传] 启用可视化 (Matplotlib)
-pip install "multimetriceval[viz]"
+# [情感] 启用 EmotionEvaluator
+pip install "multimetriceval[emotion]"
+
+# [副语言] 启用 ParalinguisticEvaluator (需包含在本地代码中调用)
+pip install transformers librosa soundfile
 
 # 安装所有功能 (推荐)
 pip install "multimetriceval[all]"
 ```
+
 
 ### 3. 安装 BLEURT (可选)
 
@@ -337,71 +347,138 @@ python -m multimetriceval.latency.cli \
 *   `ATD_SpeechAlign`
 ---
 
-## 🎭 模块三：多模态情感保真度评测 (`EmotionEvaluator`)
+## 🎭 模块三：多模态情感综合评测 (`EmotionEvaluator`)
 
-专为 **同传 / 翻译情感保留度 (Multimodal Emotion Fidelity)** 任务设计，基于业界前沿的 **V-A (Valence-Arousal)** 连续维度标准。通过比较源语言音文本与目标语言音文本的情感距离（Distance），客观衡量生成质量。
+专为 **同传/翻译情感保留度** 和 **情感生成准确率** 任务设计。基于前沿开源声音情感大模型 `iic/emotion2vec_plus_large`，提供纯音频驱动的两大维度支持：
+
+1. **跨语种情感保真度评测 (Emotion Fidelity)**：基于大模型提取的 768-d 高维情感特征，计算原音频和生成音频在情感空间中的特征余弦相似度 (Cosine Similarity)。
+2. **离散情感分类评测 (Classification Accuracy)**：将大模型用作 Zero-shot 分类器，计算生成声音的情感分类与参考目标标签的准确率（Accuracy）。
 
 ### 1. 初始化
 
-默认会自动从 HuggingFace 加载三个组件：Audeering 声学模型、XLM-RoBERTa 文本模型 和 Whisper。支持彻底离线断网加载。
+默认会自动从 ModelScope 加载基准模型。支持离线加载与自定义映射：
 
 ```python
 from multimetriceval import EmotionEvaluator
 
-# 初始化评测器，如果在无网环境，可显式指定本地文件夹路径
+# 初始化评测器
 evaluator = EmotionEvaluator(
-    audio_model_path="audeering/wav2vec2-large-robust-12-ft-emotion-msp-dim", # 或指向本地目录
-    text_model_path="cardiffnlp/twitter-xlm-roberta-base-sentiment",          # 或指向本地目录
-    whisper_model_path="large-v3",                                            # 如果没有文本则用于兜底
-    device="cuda"
+    model_id="iic/emotion2vec_plus_large",    # 默认使用 Emotion2Vec+ large 模型
+    device="cuda",                            # 自动探测，或手动指定 "cuda" / "cpu"
+    custom_label_map={"hap": "happy", "exc": "excited"} # 将模型识别标签或自定义标签统一强映射
 )
 ```
 
-### 2. 数据准备与评测
+### 2. 动态调度：数据准备与评测
 
-系统需要比对 Source（源音频） 和 Target（目标音频）。您可以选择是否传入已转写好的文本。
+工具依据你传入的方法参数自动决定执行哪种评测（或同时执行两种）。全过程**纯音频**评测，不再依赖对应文本。
+
+#### 场景 A：情感保真度 (Fidelity)
+只传 `target_audio` 和 `source_audio` 即可触发保真度测算：
 
 ```python
 results = evaluator.evaluate_all(
-    source_audio="./data/src_wavs/",  # 源语言音频
-    target_audio="./data/tgt_wavs/",  # 同传/翻译目标音频
-    # source_text="./data/src_texts.txt",  # [可选] 如果不传则内置 Whisper 进行 ASR 转写
-    # target_text="./data/tgt_texts.txt",  # [可选] 如果不传则内置 Whisper 进行 ASR 转写
+    source_audio="./data/src_wavs/",  # 原音频（如：源语言音频）
+    target_audio="./data/tgt_wavs/",  # 目标音频（如：翻译/变声后的音频）
     verbose=True
 )
 
-print(results)
-# {
-#   'Audio_Arousal_Distance_MSE': 0.0152,       # 声学唤醒度误差 (越小越好)
-#   'Text_Valence_Distance_MSE': 0.0315,        # 语义侧效价误差 (越小越好)
-#   'Final_Fused_Distance_Euclidean': 0.1751    # 综合特征融合欧氏距离 (越小越好)
-# }
+# 返回结果包含：
+# - Emotion_Fidelity_Cosine (综合情感特征余弦相似度，越接近 1 则情感越保真)
 ```
 
-### 3. JSON 数据格式支持
-
-如果你的数据存储在 JSON 中，工具也能智能解析：
+#### 场景 B：离散情感识别准确率 (Classification)
+只传目标音频 `target_audio` 与基准标签 `reference_labels` 即可触发分类测算：
 
 ```python
-# data.json 示例:
-# [{"audio": "path/to/1.wav", "label": "happy"}, ...]
+results = evaluator.evaluate_all(
+    target_audio="./data/tgt_wavs/",                 # 生成的音频
+    reference_labels=["happy", "sad", "neutral"]     # 参考的情感标签列表，也可传 .json 路径
+)
 
+# 返回结果包含：
+# - Emotion_Accuracy (模型识别得到的离散情感准确度)
+```
+> **💡 智能推演：** 假如你只传入了 `source_audio` 和 `reference_labels`，引擎会自动将其回退判定为你正在评测原音频本身的分类准确度。
+
+### 3. JSON 数据格式支持
+如果你的数据存储在 JSON 中，工具也能智能提取相关字段：
+
+```bash
+# target_data_config.json 示例:
+# [{"audio": "path/to/1.wav", "label": "happy"}, ...]
+```
+
+```python
 results = evaluator.evaluate_all(
     source_audio=["src1.wav", "src2.wav"],
-    target_audio="target_data_config.json"
+    target_audio="target_data_config.json", # 工具会自动寻找 "audio" 的音频路径
+    reference_labels="target_data_config.json" # 工具会自动寻找 "label" 进行校验
+)
+```
+## 🗣️ 模块四：副语言与声学事件评测 (`ParalinguisticEvaluator`)
+
+专为 **同传/S2ST翻译中非语言事件（Paralinguistics）的保留度** 设计。
+默认基于前沿的开源多模态环境声音分析大模型 `laion/clap-htsat-fused`，提供双轨制评测逻辑：
+
+1. **宏观连续特征保真度 (Continuous Fidelity Cosine)**：基于 CLAP 提取源与目标音频的 512 维最深层空间泛环境/声音特征的向量余弦相似度。
+2. **微观离散物理事件保留率 (Discrete Retention F1)**：基于预设描述文本（如 "laughter", "coughing"），让 CLAP 在 Zero-Shot 环境下捕捉特定事件的有无，计算目标集合相对于源集合的重叠情况 (F1 数值)。
+
+### 1. 初始化
+
+默认从 HuggingFace 加载 `laion/clap-htsat-fused`，支持开启或关闭特定轨道的测算：
+
+```python
+from multimetriceval.paralinguistic_evaluator import ParalinguisticEvaluator
+
+evaluator = ParalinguisticEvaluator(
+    use_continuous_fidelity=True,  # 是否计算宏观声学特征余弦保真度
+    use_discrete_matching=True,    # 是否计算微观离散声学事件捕获匹配度(F1)
+    clap_model_path=None,          # 可自定义为已下载的本地离线模型路径
+    device="cuda"                  # 自动探测或手动指定 "cuda" / "cpu"
 )
 ```
 
-<!-- ### 4. 自定义标签映射 (可选)
+### 2. 丰富的数据载入方式 (Data Formats)
 
-如果你的标签体系与模型不一致，可以传入映射表：
+`evaluate_all()` 方法具有极高容错性，支持通过以下**四种不同方式**传入 `source_audio` (原音频) 和 `target_audio` (翻译生成的音频) 列表。唯一要求是：**双端对齐，数目保持一致**。
 
-```python
-# 假设你的标签是 "0, 1, 2"，模型标签是 "neutral, happy, sad"
-label_map = {"0": "neutral", "1": "happy", "2": "sad"}
+*   **格式 A: 纯文件夹路径输入（推荐）**
+    只需传入两个文件夹的路径，工具会自动扫描其中的 `.wav`/`.mp3`/`.flac` 文件，并**按名字字母顺序对其排序配对**。
+    ```python
+    results = evaluator.evaluate_all(
+        source_audio="./data/S2ST_source_audios/", 
+        target_audio="./outputs/S2ST_target_audios/"
+    )
+    ```
 
-evaluator = EmotionEvaluator(use_ser=True, custom_label_map=label_map)
-``` -->
+*   **格式 B: JSON 格式配置文件**
+    如果你有一个 JSON 列表（或字典下含列表），系统会自动遍历它，提取其中名为 `audio`, `path`, `file` 等通用键值。
+    ```python
+    # data.json -> [{"id": 0, "audio": "src/1.wav"}, {"id": 1, "audio": "src/2.wav"}]
+    results = evaluator.evaluate_all(
+        source_audio="source_data.json", 
+        target_audio="target_data.json"
+    )
+    ```
+
+*   **格式 C: 预初始化的 Python 列表**
+    直接在脚本中定义好完整的音频绝对路径。
+    ```python
+    results = evaluator.evaluate_all(
+        source_audio=["./src/a.wav", "./src/b.wav"], 
+        target_audio=["./tgt/a.wav", "./tgt/b.wav"]
+    )
+    ```
+
+*   **格式 D: 换行符隔开的 `.txt` 清单文件**
+    直接读取保存有路径列表的文本文件。
+
+### 3. 微调事件探测列表 (可选项)
+
+系统默认内置的探测事件为：`["laughter", "coughing", "sighing", "breathing heavily", "throat clearing"]`。
+如果你在处理特定的 Benchmark（如 WESR 带特定的哭泣声 `crying` 标签），你可以在库源码 `_pseudo_detect_events` 逻辑中修改 `candidate_events` 变量进行完全自适应。
+
 
 ---
 
@@ -437,30 +514,35 @@ evaluator = TranslationEvaluator(
 ```
 *(注：Whisper 的 `load_model` 的 `download_root` 参数在 `TranslationEvaluator` 内部目前使用的是默认缓存或 `~/.cache/whisper`，如需完全离线指定路径，建议提前设置环境变量或将模型放入默认缓存目录)*
 
-### 4. 准备 Emotion (多模态情感) 模型
+### 4. 准备 Emotion (情感) 模型
 
-EmotionEvaluator 使用标准的 HuggingFace `transformers` 库加载声学与文本模型，以及 OpenAI 的 `whisper` 库。
+EmotionEvaluator 基于开源大模型 `emotion2vec_plus_large`，主要依赖 `funasr` 和 `modelscope` 进行加载。如果在断网环境下使用，可以通过本地路径加载：
 
-1. 下载 `audeering/...` 模型和 `twitter-xlm-roberta-...` 模型的本地文件夹。
-
-2. 在初始化时通过路径指定。
-
-
+1. 从 ModelScope (魔搭社区) 下载 `iic/emotion2vec_plus_large` 模型的完整仓库到本地文件夹。
+2. 在初始化时，将 `model_id` 替换为存放模型的绝对路径。
 
 ```python
-
 evaluator = EmotionEvaluator(
-
-    audio_model_path="/path/to/local/audeering_wav2vec2",
-
-    text_model_path="/path/to/local/xlm_roberta",
-
-    whisper_model_path="/path/to/local/whisper_medium.pt"
-
+    # 指定本地离线模型文件夹路径
+    model_id="/path/to/local/emotion2vec_plus_large", 
+    device="cuda"
 )
-
 ```
 
+### 5. 准备 Paralinguistic (副语言/CLAP) 模型
+由于 HPC 集群网络限制往往无法直连 HuggingFace：
+1. **本地下载**: 在有代理的机器上运行 Python 脚本：
+   ```python
+   from huggingface_hub import snapshot_download
+   snapshot_download(repo_id="laion/clap-htsat-fused", local_dir="./local_clap_model")
+   ```
+2. **离线加载**: 将模型上传至集群，在评测时指定物理路径：
+   ```python
+   evaluator = ParalinguisticEvaluator(
+       clap_model_path="/path/to/local_clap_model", 
+       device="cuda"
+   )
+   ```
 ---
 
 ## ⚙️ 全局配置
@@ -501,9 +583,10 @@ os.environ["HF_ENDPOINT"] = "https://hf-mirror.com"
 | | **WER/CER** | Word/Character Error Rate | 识别准确率 | **自动适配中英文** |
 | **LatencyEvaluator**| **StartOffset** | Start Offset | 首字/首音延迟 | 反应速度 |
 | | **ATD** | Average Token Delay | 平均 Token 延迟 | 综合延迟指标 |
-| **EmotionEvaluator**| **Audio Arousal Dist**| Audio Arousal Distance MSE | 声学唤醒度误差 | 基于 Audeering 模型提取 |
-| | **Text Valence Dist**| Text Valence Distance MSE | 语义级极性误差 | 基于 XLM-R 情感极性提取 |
-| | **Fused Euclidean**| Final Fused Euclidean Distance | 多模态联合评定分数 | 距离越小，情感保真度越高 |
+| **EmotionEvaluator**| **Emotion Fidelity**| Emotion Fidelity (Cosine) | 跨语种声音情感保真度 | 基于 Emotion2Vec+ 高维特征 |
+| | **Emotion Accuracy**| Emotion Classification Accuracy | 离散情感分类准确率 | 基于大模型提取特征的泛化识别 |
+| **ParalinguisticEvaluator**| **Paralinguistic Fidelity**| Paralinguistic Fidelity (Cosine)| 连续环境声学质感保真度 | 基于多模态 CLAP 判断整体氛围对齐度 |
+| | **Event Retention F1**| Event Retention Rate (F1) | 离散非语言物理发声存活率 | 测试笑声、叹气、咳嗽等是否被保留 |
 
 ---
 
