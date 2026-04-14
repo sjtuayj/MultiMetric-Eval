@@ -10,6 +10,7 @@ soundfile
 textgrid
 transformers
 matplotlib
+resemblyzer
 
 [all]
 unbabel-comet>=2.2.2

@@ -1,6 +1,6 @@
 [project]
 name = "multimetriceval"
-version = "0.7.0"  
+version = "0.7.1"  
 description = "Multi-metric evaluation toolkit supporting MT, ASR, TTS, SimulST, VC, and Paralinguistics with optimized CJK language support"
 readme = {file = "README.md", content-type = "text/markdown"}
 requires-python = ">=3.8"
@@ -36,7 +36,8 @@ dependencies = [
     "soundfile",
     "textgrid",
     "transformers",    
-    "matplotlib"       
+    "matplotlib",
+    "resemblyzer"
 ]
 
 [project.urls]

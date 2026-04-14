@@ -7,6 +7,8 @@ from .translation_evaluator import (
 
 from .emotion_evaluator import EmotionEvaluator
 from .paralinguistic_evaluator import ParalinguisticEvaluator
+from .speech_quality_evaluator import SpeechQualityEvaluator
+from .speaker_similarity_evaluator import SpeakerSimilarityEvaluator
 
 from .dataset import (
     Dataset,
@@ -21,14 +23,16 @@ from .latency.cli import LatencyEvaluator
 from .latency.agent import GenericAgent, AgentPipeline
 from .latency.basics import ReadAction, WriteAction
 
-__version__ = "0.7.0"  
+__version__ = "0.7.1"  
 
 __all__ = [
     # 核心评测器
     "TranslationEvaluator",     
     "EmotionEvaluator",         
-    "ParalinguisticEvaluator",   # 🔥 新增：副语言/声学事件评测 (Cosine/F1)
+    "ParalinguisticEvaluator",
+    "SpeechQualityEvaluator",
     "LatencyEvaluator",
+    "SpeakerSimilarityEvaluator",
     "GenericAgent",
     "AgentPipeline",
     "ReadAction", 

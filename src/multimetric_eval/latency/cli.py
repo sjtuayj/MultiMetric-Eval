@@ -38,7 +38,11 @@ class LatencyEvaluator:
             self.agent.reset()
             while not ins.finish_prediction:
                 s_in = ins.send_source(self.segment_size)
+                import time
+                t0 = time.perf_counter()
                 s_out = self.agent.pushpop(s_in)
+                t1 = time.perf_counter()
+                ins.add_inference_time(t1 - t0)
                 ins.receive_prediction(s_out)
             
             self.instances[i] = ins
@@ -58,9 +62,10 @@ class LatencyEvaluator:
                 with open(wav_dir / f"{i}_pred.txt", "w") as f:
                     f.write(transcript)
 
-    def compute_latency(self, computation_aware=False, output_dir="./output"):
+        # 增加 show_all_metrics 开关，默认为 False
+    def compute_latency(self, computation_aware=False, output_dir="./output", show_all_metrics=False):
         results = {}
-        # 扫描所有已注册的 Scorer
+        # 1. 扫描并算出所有注册的 Scorer 成绩
         for name, cls in SCORERS.items():
             try:
                 if "Align" in name:
@@ -72,9 +77,51 @@ class LatencyEvaluator:
                 key = f"{name}_CA" if computation_aware else name
                 results[key] = score
             except Exception as e:
-                # 某些指标可能因为缺少 MFA 或数据类型不对而失败，忽略
                 pass
-        return results
+        
+        # 2. 智能化筛选最高级/最准确的一个版本展示给用户
+        cleaned_results = {}
+        
+        # [A] 评估: 第一声开口延迟 (StartOffset/ALAL)
+        so_key = "StartOffset_CA" if computation_aware else "StartOffset"
+        align_so_key = "StartOffset_SpeechAlign_CA" if computation_aware else "StartOffset_SpeechAlign"
+        
+        if results.get(align_so_key) is not None and results[align_so_key] > 0:
+            cleaned_results["First_Audio_Delay_(ALAL_ms)"] = results[align_so_key]
+        else:
+            cleaned_results["First_Audio_Delay_(ALAL_ms)"] = results.get(so_key, 0)
+            
+        # [B] 评估: 整句同传综合延迟 (标准版 ATD: 连同阅读/播放音频时间一起计算)
+        atd_key = "ATD_CA" if computation_aware else "ATD"
+        align_atd_key = "ATD_SpeechAlign_CA" if computation_aware else "ATD_SpeechAlign"
+        
+        if results.get(align_atd_key) is not None and results[align_atd_key] > 0:
+            cleaned_results["Overall_Translation_Delay_(ATD_ms)"] = results[align_atd_key]
+        else:
+            cleaned_results["Overall_Translation_Delay_(ATD_ms)"] = results.get(atd_key, 0)
+
+        # [C] 评估: 模型结单同传延迟 (纯净版 CustomATD: 剔除音频合成自身的物理时长，只看模型推断何时结束)
+        catd_key = "CustomATD_CA" if computation_aware else "CustomATD"
+        align_catd_key = "CustomATD_SpeechAlign_CA" if computation_aware else "CustomATD_SpeechAlign"
+        
+        if results.get(align_catd_key) is not None and results[align_catd_key] > 0:
+            cleaned_results["End_Action_Delay_(CustomATD_ms)"] = results[align_catd_key]
+        else:
+            cleaned_results["End_Action_Delay_(CustomATD_ms)"] = results.get(catd_key, 0)
+
+        # [D] 评估: 实时率指标 (RTF)
+        if "RTF" in results:
+            cleaned_results["Real_Time_Factor_(RTF)"] = results["RTF"]
+        elif "RTF_CA" in results:
+            cleaned_results["Real_Time_Factor_(RTF)"] = results["RTF_CA"]
+
+        # ================= 修改开始 =================
+        # 如果用户显式开启了展示开关，则将原始杂乱数据装入 "detailed_all_metrics"
+        if show_all_metrics:
+            cleaned_results["detailed_all_metrics"] = results
+        # ================= 修改结束 =================
+
+        return cleaned_results
 
 def load_agent_from_file(path, class_name):
     """动态加载用户 Agent"""

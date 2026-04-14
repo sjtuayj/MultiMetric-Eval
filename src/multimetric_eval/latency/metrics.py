@@ -18,6 +18,8 @@ def with_alignment(scorer_cls):
 
         def __call__(self, instances):
             self.aligner.run_mfa()
+            aligned_success = False  # 🌟 新增标志位跟踪
+            
             for idx, ins in instances.items():
                 if not isinstance(ins, SpeechToSpeechInstance): continue
                 start_offset = ins.delays[0] if ins.delays else 0
@@ -25,6 +27,12 @@ def with_alignment(scorer_cls):
                 if aligned:
                     ins.raw_delays = ins.delays 
                     ins.delays = aligned
+                    aligned_success = True  # 🌟 如果有哪怕一句成功对齐了，标记为True
+
+            # 🌟 新增拦截：如果完全没调通MFA，直接返回 None，不骗人
+            if not aligned_success:
+                return None
+                
             return super().__call__(instances)
     return AlignedScorer
 
@@ -223,3 +231,27 @@ class CustomATD(ATDScorer):
 @with_alignment
 class CustomATDAligned(CustomATD):
     pass
+
+@register("RTF")
+class RTFScorer(LatencyScorer):
+    """
+    Real-Time Factor (RTF)
+    计算公式: 总推理耗时 / 源音频总时长
+    含义: 值越小越好。如果RTF < 1，说明模型处理速度快于人说话速度（满足实时要求）。
+    """
+    def __call__(self, instances) -> float:
+        from statistics import mean
+        scores = []
+        for ins in instances.values():
+            if not hasattr(ins, "total_inference_time"):
+                continue
+                
+            # source_length() 是以毫秒为单位的，因此除以 1000 转成秒
+            src_len_sec = ins.source_length / 1000.0
+            if src_len_sec <= 0:
+                continue
+                
+            rtf = ins.total_inference_time / src_len_sec
+            scores.append(rtf)
+            
+        return mean(scores) if scores else 0.0

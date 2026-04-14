@@ -20,6 +20,7 @@ class Instance:
         self.start_time = None
         self.durations = [] # S2S 专用
         self.finish_prediction = False
+        self.total_inference_time = 0.0 
 
     def summarize(self):
         return {
@@ -59,6 +60,10 @@ class SpeechToTextInstance(Instance):
             self.source_finished_reading = True
             return EmptySegment(finished=True)
 
+    def add_inference_time(self, time_spent_in_seconds: float):
+        """累加纯模型计算时间"""
+        self.total_inference_time += time_spent_in_seconds
+        
     def receive_prediction(self, seg: Segment):
         if self.finish_prediction or seg.is_empty:
             self.finish_prediction = seg.finished
