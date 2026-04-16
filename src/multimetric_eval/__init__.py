@@ -23,7 +23,7 @@ from .latency.cli import LatencyEvaluator
 from .latency.agent import GenericAgent, AgentPipeline
 from .latency.basics import ReadAction, WriteAction
 
-__version__ = "0.7.1"  
+__version__ = "0.7.2"  
 
 __all__ = [
     # 核心评测器
