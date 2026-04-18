@@ -1,6 +1,6 @@
 # MultiMetric-Eval
 
-[![PyPI version](https://badge.fury.io/py/multimetriceval.svg)](https://pypi.org/project/multimetriceval/0.7.2/)
+[![PyPI version](https://badge.fury.io/py/multimetriceval.svg)](https://pypi.org/project/multimetriceval/0.8.0/)
 [![Python 3.8+](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
@@ -13,7 +13,7 @@ MultiMetric-Eval 是一个聚焦于翻译与语音翻译的评测工具包。它
 - MT 或 S2TT 的文本侧评测，支持 `BLEU`、`chrF++`、`COMET`、`BLEURT`
 - S2ST 的综合评测，可组合文本质量、语音质量、说话人相似度与延迟指标
 - 使用自定义 agent 的流式或同声传译延迟评测
-- 面向语音翻译输出的保真分析，包括说话人、情感与副语言事件保留
+- 面向语音翻译输出的保真分析，包括说话人、情感与副语言相似度
 
 ## 能力边界
 
@@ -36,7 +36,7 @@ MultiMetric-Eval 是评测工具，不是训练或推理框架。
 | `SpeechQualityEvaluator` | 语音自然度与文本-语音一致性 | `UTMOS`, `WER_Consistency`, `CER_Consistency` |
 | `SpeakerSimilarityEvaluator` | 说话人保真 | `wavlm_similarity`, `resemblyzer_similarity` |
 | `EmotionEvaluator` | 情感保真或情感分类准确率 | `Emotion2Vec_Cosine_Similarity`, `Audio_Emotion_Accuracy` |
-| `ParalinguisticEvaluator` | 非言语与副语言信息保留 | `Paralinguistic_Fidelity_Cosine`, `Event_Retention_F1` |
+| `ParalinguisticEvaluator` | 非言语与副语言相似度 | `Paralinguistic_Fidelity_Cosine` |
 | `LatencyEvaluator` | 流式 / 同传延迟评测 | `StartOffset`, `ATD`, `CustomATD`, `RTF` |
 
 ## 安装
@@ -175,6 +175,7 @@ print(results)
 
 - 对于 `zh` / `ja` / `ko`，工具包在文本侧评测中使用了针对 CJK 的处理逻辑。
 - `SpeechQualityEvaluator` 在 `zh` / `ja` / `ko` 上返回 `CER_Consistency`，在多数其他语言上返回 `WER_Consistency`。
+- `ParalinguisticEvaluator` 当前只返回 `Paralinguistic_Fidelity_Cosine`，它是基于 embedding 的源音频与目标音频连续相似度指标。
 - 某些模块依赖可选安装项，或者在离线环境中需要指定本地模型路径。
 
 ## License

@@ -1,5 +1,11 @@
-# Python cache
-__pycache__/
-*.pyc
-*.pyo
-*.pyd
+/src/**/__pycache__/
+/examples/**/__pycache__/
+/src/**/*.pyc
+/src/**/*.pyo
+/src/**/*.pyd
+/examples/**/*.pyc
+/examples/**/*.pyo
+/examples/**/*.pyd
+/dist/
+/src/*.egg-info/
+/src/**/*.egg-info/

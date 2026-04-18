@@ -26,7 +26,7 @@ class SpeakerSimilarityEvaluator:
     def __init__(self, 
                  model_type="wavlm", 
                  device=None, 
-                 wavlm_model_path="./model/wavlm-base-plus-sv",
+                 wavlm_model_path="microsoft/wavlm-base-plus-sv",
                  resemblyzer_weights_path="pretrained.pt"):
         """
         初始化打分器，仅在初始化时加载一次模型。

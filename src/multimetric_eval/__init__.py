@@ -6,7 +6,15 @@ from .translation_evaluator import (
 
 
 from .emotion_evaluator import EmotionEvaluator
-from .paralinguistic_evaluator import ParalinguisticEvaluator
+from .paralinguistic_evaluator import (
+    EventSpan,
+    ParalinguisticEvaluator,
+    ParalinguisticSample,
+    build_paralinguistic_inputs,
+    evaluate_paralinguistic_dataset,
+    load_paralinguistic_samples,
+    load_paralinguistic_manifest,
+)
 from .speech_quality_evaluator import SpeechQualityEvaluator
 from .speaker_similarity_evaluator import SpeakerSimilarityEvaluator
 
@@ -23,13 +31,19 @@ from .latency.cli import LatencyEvaluator
 from .latency.agent import GenericAgent, AgentPipeline
 from .latency.basics import ReadAction, WriteAction
 
-__version__ = "0.7.2"  
+__version__ = "0.8.0"  
 
 __all__ = [
     # 核心评测器
     "TranslationEvaluator",     
     "EmotionEvaluator",         
     "ParalinguisticEvaluator",
+    "EventSpan",
+    "ParalinguisticSample",
+    "load_paralinguistic_manifest",
+    "load_paralinguistic_samples",
+    "build_paralinguistic_inputs",
+    "evaluate_paralinguistic_dataset",
     "SpeechQualityEvaluator",
     "LatencyEvaluator",
     "SpeakerSimilarityEvaluator",

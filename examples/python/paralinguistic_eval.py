@@ -4,7 +4,6 @@ from multimetric_eval import ParalinguisticEvaluator
 def main():
     evaluator = ParalinguisticEvaluator(
         use_continuous_fidelity=True,
-        use_discrete_matching=True,
         device="cuda",
     )
 

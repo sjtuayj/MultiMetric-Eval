@@ -2,7 +2,7 @@
 
 English | [中文](./README_zh.md)
 
-[![PyPI version](https://badge.fury.io/py/multimetriceval.svg)](https://pypi.org/project/multimetriceval/0.7.2/)
+[![PyPI version](https://badge.fury.io/py/multimetriceval.svg)](https://pypi.org/project/multimetriceval/0.8.0/)
 [![Python 3.8+](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
@@ -15,7 +15,7 @@ This project is best suited for these directions:
 - MT or S2TT text-side evaluation with `BLEU`, `chrF++`, `COMET`, and `BLEURT`
 - S2ST evaluation by combining text quality, speech quality, speaker similarity, and latency
 - Streaming or simultaneous speech translation latency evaluation with a custom agent
-- Preservation analysis for speech translation outputs, including speaker similarity, emotion, and paralinguistic events
+- Preservation analysis for speech translation outputs, including speaker similarity, emotion, and paralinguistic similarity
 
 ## Capability Boundary
 
@@ -38,7 +38,7 @@ It is not designed to be:
 | `SpeechQualityEvaluator` | Naturalness and text-speech consistency | `UTMOS`, `WER_Consistency`, `CER_Consistency` |
 | `SpeakerSimilarityEvaluator` | Speaker preservation | `wavlm_similarity`, `resemblyzer_similarity` |
 | `EmotionEvaluator` | Emotion preservation or classification accuracy | `Emotion2Vec_Cosine_Similarity`, `Audio_Emotion_Accuracy` |
-| `ParalinguisticEvaluator` | Non-verbal and paralinguistic preservation | `Paralinguistic_Fidelity_Cosine`, `Event_Retention_F1` |
+| `ParalinguisticEvaluator` | Non-verbal and paralinguistic similarity | `Paralinguistic_Fidelity_Cosine` |
 | `LatencyEvaluator` | Streaming / simultaneous translation latency | `StartOffset`, `ATD`, `CustomATD`, `RTF` |
 
 ## Installation
@@ -177,6 +177,7 @@ Common audio inputs support:
 
 - For `zh` / `ja` / `ko`, the toolkit uses CJK-aware handling for text-side evaluation.
 - `SpeechQualityEvaluator` returns `CER_Consistency` for `zh` / `ja` / `ko`, and `WER_Consistency` for most other languages.
+- `ParalinguisticEvaluator` currently reports only `Paralinguistic_Fidelity_Cosine`, an embedding-based continuous similarity metric between source and target audio.
 - Some modules rely on optional dependencies or local model paths in offline environments.
 
 ## License
