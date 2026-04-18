@@ -7,6 +7,7 @@ from .translation_evaluator import (
 
 from .emotion_evaluator import EmotionEvaluator
 from .paralinguistic_evaluator import (
+    DiscreteEventConfig,
     EventSpan,
     ParalinguisticEvaluator,
     ParalinguisticSample,
@@ -31,13 +32,14 @@ from .latency.cli import LatencyEvaluator
 from .latency.agent import GenericAgent, AgentPipeline
 from .latency.basics import ReadAction, WriteAction
 
-__version__ = "0.8.0"  
+__version__ = "0.8.1"  
 
 __all__ = [
     # 核心评测器
     "TranslationEvaluator",     
     "EmotionEvaluator",         
     "ParalinguisticEvaluator",
+    "DiscreteEventConfig",
     "EventSpan",
     "ParalinguisticSample",
     "load_paralinguistic_manifest",

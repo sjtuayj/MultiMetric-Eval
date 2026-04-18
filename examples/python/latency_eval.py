@@ -1,7 +1,12 @@
+import time
+
 from multimetric_eval import GenericAgent, LatencyEvaluator, ReadAction, WriteAction
 
 
 class WaitUntilEndAgent(GenericAgent):
+    def fake_model_generate(self):
+        return "hello world"
+
     def policy(self, states=None):
         states = states or self.states
 
@@ -9,7 +14,11 @@ class WaitUntilEndAgent(GenericAgent):
             return ReadAction()
 
         if not states.target_finished:
-            return WriteAction("hello world", finished=True)
+            t0 = time.perf_counter()
+            prediction = self.fake_model_generate()
+            t1 = time.perf_counter()
+            self.record_model_inference_time(t1 - t0)
+            return WriteAction(prediction, finished=True)
 
         return ReadAction()
 
@@ -33,6 +42,14 @@ def main():
     )
 
     print(scores)
+
+    # For S2S agents, return a SpeechSegment and put the native transcript and
+    # pure model time in seg.config, for example:
+    # config={
+    #     "transcript": pred_text,
+    #     "transcript_source": "native_transcript",
+    #     "model_inference_time": generate_seconds,
+    # }
 
 
 if __name__ == "__main__":

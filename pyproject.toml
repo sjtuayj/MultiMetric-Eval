@@ -1,6 +1,6 @@
 [project]
 name = "multimetriceval"
-version = "0.8.0"  
+version = "0.8.1"  
 description = "Multi-metric evaluation toolkit supporting MT, ASR, TTS, SimulST, VC, and Paralinguistics with optimized CJK language support"
 readme = {file = "README.md", content-type = "text/markdown"}
 requires-python = ">=3.8"
@@ -13,7 +13,7 @@ keywords = [
     "translation", "evaluation", "BLEU", "COMET", "BLEURT",
     "ASR", "speech-synthesis", "voice-conversion", "UTMOS", "WER",
     "machine-translation", "multilingual", "CJK", "emotion",
-    "paralinguistics", "CLAP" 
+    "paralinguistics", "CLAP", "PANNs" 
 ]
 
 classifiers = [
@@ -50,5 +50,5 @@ Documentation = "https://github.com/sjtuayj/MultiMetric-Eval#readme"
 comet = ["unbabel-comet>=2.2.2"]
 whisper = ["openai-whisper"]
 emotion = ["funasr", "modelscope"]  
-paralinguistics = ["librosa"]       
-all = ["unbabel-comet>=2.2.2", "openai-whisper", "funasr", "modelscope", "librosa"] 
+paralinguistics = ["librosa", "panns-inference"]       
+all = ["unbabel-comet>=2.2.2", "openai-whisper", "funasr", "modelscope", "librosa", "panns-inference"] 

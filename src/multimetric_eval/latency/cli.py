@@ -1,17 +1,14 @@
 import argparse
-import sys
 import importlib.util
 import sys
-import os
 from pathlib import Path
-from tqdm import tqdm
-from .utils import submit_slurm, Visualizer
 
-from .basics import ReadAction, WriteAction
+from tqdm import tqdm
+
+from .agent import GenericAgent
 from .instance import SpeechToTextInstance, SpeechToSpeechInstance
-from .agent import GenericAgent, AgentPipeline
 from .metrics import SCORERS
-from .utils import submit_slurm, Visualizer
+from .utils import Visualizer, materialize_s2s_alignment_artifacts, submit_slurm
 
 # --- 引入兄弟模块 (紧耦合) ---
 # 注意：使用相对导入或包绝对导入
@@ -19,10 +16,26 @@ from ..translation_evaluator import TranslationEvaluator
 
 class LatencyEvaluator:
     """同传延迟与质量评测器"""
-    def __init__(self, agent: GenericAgent, segment_size=20):
+    def __init__(
+        self,
+        agent: GenericAgent,
+        segment_size=20,
+        latency_unit="word",
+        asr_fallback_for_s2s_alignment=True,
+        asr_model="medium",
+        asr_device=None,
+        alignment_acoustic_model="english_mfa",
+        alignment_dictionary_model="english_mfa",
+    ):
         self.agent = agent
         self.segment_size = segment_size
         self.instances = {}
+        self.latency_unit = latency_unit
+        self.asr_fallback_for_s2s_alignment = asr_fallback_for_s2s_alignment
+        self.asr_model = asr_model
+        self.asr_device = asr_device
+        self.alignment_acoustic_model = alignment_acoustic_model
+        self.alignment_dictionary_model = alignment_dictionary_model
 
     def run(self, source_files, ref_files, task="s2t", output_dir="./output", visualize=False):
         Path(output_dir).mkdir(parents=True, exist_ok=True)
@@ -43,6 +56,8 @@ class LatencyEvaluator:
                 s_out = self.agent.pushpop(s_in)
                 t1 = time.perf_counter()
                 ins.add_inference_time(t1 - t0)
+                if hasattr(self.agent, "consume_model_inference_time"):
+                    ins.add_model_inference_time(self.agent.consume_model_inference_time())
                 ins.receive_prediction(s_out)
             
             self.instances[i] = ins
@@ -55,12 +70,14 @@ class LatencyEvaluator:
         return self.instances
 
     def _prepare_s2s_transcripts(self, output_dir):
-        wav_dir = Path(output_dir) / "wavs"
-        if wav_dir.exists():
-            for i, ins in self.instances.items():
-                transcript = ins.reference if ins.reference else "unknown"
-                with open(wav_dir / f"{i}_pred.txt", "w") as f:
-                    f.write(transcript)
+        materialize_s2s_alignment_artifacts(
+            self.instances,
+            output_dir,
+            unit=self.latency_unit,
+            asr_fallback=self.asr_fallback_for_s2s_alignment,
+            asr_model=self.asr_model,
+            asr_device=self.asr_device,
+        )
 
         # 增加 show_all_metrics 开关，默认为 False
     def compute_latency(self, computation_aware=False, output_dir="./output", show_all_metrics=False):
@@ -69,7 +86,12 @@ class LatencyEvaluator:
         for name, cls in SCORERS.items():
             try:
                 if "Align" in name:
-                    scorer = cls(computation_aware=computation_aware, output_dir=output_dir)
+                    scorer = cls(
+                        computation_aware=computation_aware,
+                        output_dir=output_dir,
+                        alignment_acoustic_model=self.alignment_acoustic_model,
+                        alignment_dictionary_model=self.alignment_dictionary_model,
+                    )
                 else:
                     scorer = cls(computation_aware=computation_aware)
                 
@@ -115,6 +137,11 @@ class LatencyEvaluator:
         elif "RTF_CA" in results:
             cleaned_results["Real_Time_Factor_(RTF)"] = results["RTF_CA"]
 
+        if "ModelGenerateRTF" in results and results["ModelGenerateRTF"] is not None:
+            cleaned_results["Model_Generate_RTF"] = results["ModelGenerateRTF"]
+        elif "ModelGenerateRTF_CA" in results and results["ModelGenerateRTF_CA"] is not None:
+            cleaned_results["Model_Generate_RTF"] = results["ModelGenerateRTF_CA"]
+
         # ================= 修改开始 =================
         # 如果用户显式开启了展示开关，则将原始杂乱数据装入 "detailed_all_metrics"
         if show_all_metrics:
@@ -139,6 +166,11 @@ def main():
     parser.add_argument("--agent-script", required=True, help="Path to python file containing Agent class")
     parser.add_argument("--agent-class", required=True, help="Name of the Agent class")
     parser.add_argument("--segment-size", type=int, default=20)
+    parser.add_argument("--latency-unit", choices=["word", "char"], default="word")
+    parser.add_argument("--disable-asr-fallback", action="store_true")
+    parser.add_argument("--asr-model", default="medium")
+    parser.add_argument("--alignment-acoustic-model", default="english_mfa")
+    parser.add_argument("--alignment-dictionary-model", default="english_mfa")
     parser.add_argument("--computation-aware", action="store_true")
     parser.add_argument("--quality", action="store_true", help="Run Quality Evaluation (BLEU/WER) after latency")
     parser.add_argument("--slurm", action="store_true")
@@ -158,7 +190,15 @@ def main():
     agent = AgentClass()
     
     # 3. 运行 Latency 评测
-    evaluator = LatencyEvaluator(agent, args.segment_size)
+    evaluator = LatencyEvaluator(
+        agent,
+        args.segment_size,
+        latency_unit=args.latency_unit,
+        asr_fallback_for_s2s_alignment=not args.disable_asr_fallback,
+        asr_model=args.asr_model,
+        alignment_acoustic_model=args.alignment_acoustic_model,
+        alignment_dictionary_model=args.alignment_dictionary_model,
+    )
     instances = evaluator.run(src, ref, args.task, args.output)
     
     # 4. 计算 Latency 指标

@@ -1,32 +1,30 @@
 # MultiMetric-Eval
 
-[![PyPI version](https://badge.fury.io/py/multimetriceval.svg)](https://pypi.org/project/multimetriceval/0.8.0/)
+[![PyPI version](https://badge.fury.io/py/multimetriceval.svg)](https://pypi.org/project/multimetriceval/0.8.1/)
 [![Python 3.8+](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-MultiMetric-Eval 是一个聚焦于翻译与语音翻译的评测工具包。它提供统一的方式来评估文本翻译质量、语音输出质量、保真相关属性，以及流式延迟表现。
+MultiMetric-Eval 是一个面向机器翻译与语音翻译的评测工具包。它提供统一接口来评估文本翻译质量、语音输出质量、保真相关属性，以及流式延迟表现。
 
-## 可用于哪些任务
-
-这个项目最适合以下方向：
+## 适用场景
 
 - MT 或 S2TT 的文本侧评测，支持 `BLEU`、`chrF++`、`COMET`、`BLEURT`
 - S2ST 的综合评测，可组合文本质量、语音质量、说话人相似度与延迟指标
-- 使用自定义 agent 的流式或同声传译延迟评测
+- 使用自定义 agent 的流式或同传延迟评测
 - 面向语音翻译输出的保真分析，包括说话人、情感与副语言相似度
 
 ## 能力边界
 
 MultiMetric-Eval 是评测工具，不是训练或推理框架。
 
-当你已经有模型输出，并希望用统一方式进行打分时，它会比较合适。
+当你已经有模型输出，并希望以统一方式打分时，它比较合适。
 
-它并不是为以下目标设计的：
+它不用于：
 
-- 通用 ASR 工具包
-- 通用 TTS 工具包
+- 通用 ASR 工具链
+- 通用 TTS 工具链
 - 模型服务框架
-- 替代其他非翻译语音方向的专用工具
+- 替代其他非翻译语音任务的专用工具
 
 ## 核心模块
 
@@ -36,8 +34,8 @@ MultiMetric-Eval 是评测工具，不是训练或推理框架。
 | `SpeechQualityEvaluator` | 语音自然度与文本-语音一致性 | `UTMOS`, `WER_Consistency`, `CER_Consistency` |
 | `SpeakerSimilarityEvaluator` | 说话人保真 | `wavlm_similarity`, `resemblyzer_similarity` |
 | `EmotionEvaluator` | 情感保真或情感分类准确率 | `Emotion2Vec_Cosine_Similarity`, `Audio_Emotion_Accuracy` |
-| `ParalinguisticEvaluator` | 非言语与副语言相似度 | `Paralinguistic_Fidelity_Cosine` |
-| `LatencyEvaluator` | 流式 / 同传延迟评测 | `StartOffset`, `ATD`, `CustomATD`, `RTF` |
+| `ParalinguisticEvaluator` | 非言语与副语言相似度 | `Paralinguistic_Fidelity_Cosine`, `Discrete_Acoustic_Event_F1_Strict`, `Discrete_Acoustic_Event_F1_Relaxed` |
+| `LatencyEvaluator` | 流式 / 同传延迟评测 | `StartOffset`, `ATD`, `CustomATD`, `RTF`, `Model_Generate_RTF` |
 
 ## 安装
 
@@ -129,9 +127,73 @@ results = evaluator.evaluate_all(
 print(results)
 ```
 
+### 延迟评测
+
+```python
+from multimetric_eval import GenericAgent, LatencyEvaluator, ReadAction, WriteAction
+
+
+class WaitUntilEndAgent(GenericAgent):
+    def policy(self, states=None):
+        states = states or self.states
+
+        if not states.source_finished:
+            return ReadAction()
+
+        if not states.target_finished:
+            prediction = "hello world"
+            self.record_model_inference_time(0.12)
+            return WriteAction(prediction, finished=True)
+
+        return ReadAction()
+
+
+agent = WaitUntilEndAgent()
+evaluator = LatencyEvaluator(agent, segment_size=20)
+```
+
+延迟输出现在区分两类 RTF：
+
+- `Real_Time_Factor_(RTF)`：系统级 RTF，包含 agent policy、预处理、后处理以及模型推理周边开销。
+- `Model_Generate_RTF`：模型级 RTF。只有 agent 显式调用 `record_model_inference_time(...)`，或在 `Segment.config["model_inference_time"]` 中提供模型推理时间时才会输出。
+
+### 副语言评测
+
+```python
+from multimetric_eval import ParalinguisticEvaluator
+
+evaluator = ParalinguisticEvaluator(
+    use_continuous_fidelity=True,
+    use_discrete_event_f1=True,
+    discrete_event_config={
+        "detector_backend": "panns",
+        "score_threshold": 0.3,
+    },
+    device="cuda",
+)
+
+results = evaluator.evaluate_all(
+    source_audio=["./src_wavs/sample_001.wav"],
+    target_audio=["./tgt_wavs/sample_001.wav"],
+    source_event_annotations=[
+        [
+            {"label": "laugh", "start_ms": 1200, "end_ms": 1850},
+            {"label": "cough", "start_ms": 4200, "end_ms": 4550},
+        ]
+    ],
+    event_label_mapping={
+        "Laughter": "laugh",
+        "Giggle": "laugh",
+        "Cough": "cough",
+    },
+)
+
+print(results)
+```
+
 ## 示例
 
-示例统一放到了 `examples/` 目录。
+示例统一放在 `examples/` 目录。
 
 ### Python 示例
 
@@ -149,7 +211,7 @@ print(results)
 
 ### 完整评测流程脚本
 
-更完整的端到端评测脚本可以看 `test/` 目录：
+更完整的端到端评测脚本可见 `test/`：
 
 - `test/run_full_eval_seamless.py`
 - `test/run_full_eval_vallex.py`
@@ -173,9 +235,14 @@ print(results)
 
 ## 说明
 
-- 对于 `zh` / `ja` / `ko`，工具包在文本侧评测中使用了针对 CJK 的处理逻辑。
-- `SpeechQualityEvaluator` 在 `zh` / `ja` / `ko` 上返回 `CER_Consistency`，在多数其他语言上返回 `WER_Consistency`。
-- `ParalinguisticEvaluator` 当前只返回 `Paralinguistic_Fidelity_Cosine`，它是基于 embedding 的源音频与目标音频连续相似度指标。
+- 对 `zh` / `ja` / `ko`，工具包在文本侧评测中使用 CJK 友好的处理逻辑。
+- `SpeechQualityEvaluator` 在 `zh` / `ja` / `ko` 上返回 `CER_Consistency`，在大多数其他语言上返回 `WER_Consistency`。
+- `ParalinguisticEvaluator` 通过 CLAP 输出 `Paralinguistic_Fidelity_Cosine`，同时也支持输出离散事件保留指标 `Discrete_Acoustic_Event_F1_Strict` 与 `Discrete_Acoustic_Event_F1_Relaxed`。
+- 内置的离散事件检测器当前使用 PANNs 后端，并依赖 `paralinguistics` extra。
+- 对离散事件 F1，源端事件标签应当是规范化后的目标标签体系；`event_label_mapping` 作用在目标端检测器输出上，用于适配不同数据集或标签体系。
+- 当某条样本在源端和目标端都没有事件时，该样本会在离散事件 F1 聚合时被跳过。
+- 在 S2S latency 中，如果模型有原生 transcript，会优先使用原生 transcript 做对齐；如果模型只有音频输出，可以开启 ASR fallback 生成对齐文本。
+- 做 S2S 强制对齐时，应显式传入目标语言对应的 MFA `alignment_acoustic_model` 与 `alignment_dictionary_model`；默认值是英文模型。
 - 某些模块依赖可选安装项，或者在离线环境中需要指定本地模型路径。
 
 ## License
