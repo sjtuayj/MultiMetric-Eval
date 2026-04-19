@@ -1,6 +1,6 @@
 # MultiMetric-Eval
 
-[![PyPI version](https://badge.fury.io/py/multimetriceval.svg)](https://pypi.org/project/multimetriceval/0.8.1/)
+[![PyPI version](https://badge.fury.io/py/multimetriceval.svg)](https://pypi.org/project/multimetriceval/0.8.2/)
 [![Python 3.8+](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
@@ -83,131 +83,35 @@ from multimetric_eval import TranslationEvaluator, SpeechQualityEvaluator
 
 ## 快速开始
 
-### 文本翻译评测
+快速开始脚本统一放在 `examples/` 目录。
 
-```python
-from multimetric_eval import TranslationEvaluator
-
-evaluator = TranslationEvaluator(
-    use_bleu=True,
-    use_chrf=True,
-    use_comet=False,
-    use_bleurt=False,
-    device="cuda",
-)
-
-results = evaluator.evaluate_all(
-    reference=["我喜欢看电影。"],
-    target_text=["我喜欢看电影。"],
-    source=["I like watching movies."],
-    target_lang="zh",
-)
-
-print(results)
-```
-
-### 语音质量评测
-
-```python
-from multimetric_eval import SpeechQualityEvaluator
-
-evaluator = SpeechQualityEvaluator(
-    use_wer=True,
-    use_utmos=True,
-    whisper_model="medium",
-    device="cuda",
-)
-
-results = evaluator.evaluate_all(
-    target_audio="./generated_wavs",
-    target_text=["你好世界", "这是一个测试"],
-    target_lang="zh",
-)
-
-print(results)
-```
-
-### 延迟评测
-
-```python
-from multimetric_eval import GenericAgent, LatencyEvaluator, ReadAction, WriteAction
-
-
-class WaitUntilEndAgent(GenericAgent):
-    def policy(self, states=None):
-        states = states or self.states
-
-        if not states.source_finished:
-            return ReadAction()
-
-        if not states.target_finished:
-            prediction = "hello world"
-            self.record_model_inference_time(0.12)
-            return WriteAction(prediction, finished=True)
-
-        return ReadAction()
-
-
-agent = WaitUntilEndAgent()
-evaluator = LatencyEvaluator(agent, segment_size=20)
-```
-
-延迟输出现在区分两类 RTF：
-
-- `Real_Time_Factor_(RTF)`：系统级 RTF，包含 agent policy、预处理、后处理以及模型推理周边开销。
-- `Model_Generate_RTF`：模型级 RTF。只有 agent 显式调用 `record_model_inference_time(...)`，或在 `Segment.config["model_inference_time"]` 中提供模型推理时间时才会输出。
-
-### 副语言评测
-
-```python
-from multimetric_eval import ParalinguisticEvaluator
-
-evaluator = ParalinguisticEvaluator(
-    use_continuous_fidelity=True,
-    use_discrete_event_f1=True,
-    discrete_event_config={
-        "detector_backend": "panns",
-        "score_threshold": 0.3,
-    },
-    device="cuda",
-)
-
-results = evaluator.evaluate_all(
-    source_audio=["./src_wavs/sample_001.wav"],
-    target_audio=["./tgt_wavs/sample_001.wav"],
-    source_event_annotations=[
-        [
-            {"label": "laugh", "start_ms": 1200, "end_ms": 1850},
-            {"label": "cough", "start_ms": 4200, "end_ms": 4550},
-        ]
-    ],
-    event_label_mapping={
-        "Laughter": "laugh",
-        "Giggle": "laugh",
-        "Cough": "cough",
-    },
-)
-
-print(results)
-```
-
-## 示例
-
-示例统一放在 `examples/` 目录。
-
-### Python 示例
+Python 示例：
 
 - `examples/python/translation_eval.py`
 - `examples/python/speech_quality_eval.py`
 - `examples/python/speaker_similarity_eval.py`
 - `examples/python/emotion_eval.py`
 - `examples/python/paralinguistic_eval.py`
+- `examples/python/paralinguistic_identity_baseline.py`
 - `examples/python/latency_eval.py`
 
-### Bash 示例
+Shell 示例：
 
 - `examples/bash/install_extras.sh`
 - `examples/bash/run_latency_cli.sh`
+
+延迟输出现在区分两类 RTF：
+
+- `Real_Time_Factor_(RTF)`：系统级 RTF，包含 agent policy、预处理、后处理以及模型推理周边开销。
+- `Model_Generate_RTF`：模型级 RTF。只有 agent 显式调用 `record_model_inference_time(...)`，或在 `Segment.config["model_inference_time"]` 中提供模型推理时间时才会输出。
+
+## 示例
+
+示例统一放在 `examples/` 目录。副语言评测相关示例覆盖了以下几种典型用法：
+
+- 带时间戳 `source_event_annotations` 的严格事件 F1
+- 只有句级标签时的 relaxed 事件 F1
+- 不经过翻译模型、直接使用源音频作为目标音频的 identity baseline
 
 ### 完整评测流程脚本
 
@@ -238,9 +142,12 @@ print(results)
 - 对 `zh` / `ja` / `ko`，工具包在文本侧评测中使用 CJK 友好的处理逻辑。
 - `SpeechQualityEvaluator` 在 `zh` / `ja` / `ko` 上返回 `CER_Consistency`，在大多数其他语言上返回 `WER_Consistency`。
 - `ParalinguisticEvaluator` 通过 CLAP 输出 `Paralinguistic_Fidelity_Cosine`，同时也支持输出离散事件保留指标 `Discrete_Acoustic_Event_F1_Strict` 与 `Discrete_Acoustic_Event_F1_Relaxed`。
-- 内置的离散事件检测器当前使用 PANNs 后端，并依赖 `paralinguistics` extra。
-- 对离散事件 F1，源端事件标签应当是规范化后的目标标签体系；`event_label_mapping` 作用在目标端检测器输出上，用于适配不同数据集或标签体系。
-- 当某条样本在源端和目标端都没有事件时，该样本会在离散事件 F1 聚合时被跳过。
+- `Discrete_Acoustic_Event_F1_Strict` 需要源端和目标端都提供带时间戳的事件标注；`Discrete_Acoustic_Event_F1_Relaxed` 可用于句级标签。
+- 如果源端只有句级标签，且目标端没有显式事件或标签标注，评测会回退到 `clap_label_matching`。在这一路径下只会输出 relaxed 指标，事件检测器 checkpoint 不会参与计算。
+- 内置事件检测器可加载任何兼容 `transformers` `AutoModelForAudioClassification` 且暴露 `id2label` 的 checkpoint。用户可以通过 `beats_model_path` 或 `detector_model_path` 传入本地路径或 Hugging Face repo id；未指定时才会尝试内置的 BEATs 默认候选。
+- `allowed_labels` 会同时限制 detector 输出标签集合和 CLAP 的候选标签集合。
+- 对离散事件 F1，源端事件标签应尽量是规范化后的 canonical label；`event_label_mapping` 作用在目标端预测标签上，用于适配不同数据集或标签体系。
+- 当某条样本在源端和目标端都没有事件或标签时，它会以零计数参与聚合，而不是作为特殊样本被跳过。
 - 在 S2S latency 中，如果模型有原生 transcript，会优先使用原生 transcript 做对齐；如果模型只有音频输出，可以开启 ASR fallback 生成对齐文本。
 - 做 S2S 强制对齐时，应显式传入目标语言对应的 MFA `alignment_acoustic_model` 与 `alignment_dictionary_model`；默认值是英文模型。
 - 某些模块依赖可选安装项，或者在离线环境中需要指定本地模型路径。

@@ -2,7 +2,7 @@
 
 English | [中文](./README_zh.md)
 
-[![PyPI version](https://badge.fury.io/py/multimetriceval.svg)](https://pypi.org/project/multimetriceval/0.8.1/)
+[![PyPI version](https://badge.fury.io/py/multimetriceval.svg)](https://pypi.org/project/multimetriceval/0.8.2/)
 [![Python 3.8+](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
@@ -87,108 +87,22 @@ from multimetric_eval import TranslationEvaluator, SpeechQualityEvaluator
 
 ## Quick Start
 
-### Text Translation
+Quick-start scripts live under `examples/`.
 
-```python
-from multimetric_eval import TranslationEvaluator
+Python examples:
 
-evaluator = TranslationEvaluator(
-    use_bleu=True,
-    use_chrf=True,
-    use_comet=False,
-    use_bleurt=False,
-    device="cuda",
-)
+- `examples/python/translation_eval.py`
+- `examples/python/speech_quality_eval.py`
+- `examples/python/speaker_similarity_eval.py`
+- `examples/python/emotion_eval.py`
+- `examples/python/paralinguistic_eval.py`
+- `examples/python/paralinguistic_identity_baseline.py`
+- `examples/python/latency_eval.py`
 
-results = evaluator.evaluate_all(
-    reference=["我喜欢看电影。"],
-    target_text=["我喜欢看电影。"],
-    source=["I like watching movies."],
-    target_lang="zh",
-)
+Shell examples:
 
-print(results)
-```
-
-### Speech Quality
-
-```python
-from multimetric_eval import SpeechQualityEvaluator
-
-evaluator = SpeechQualityEvaluator(
-    use_wer=True,
-    use_utmos=True,
-    whisper_model="medium",
-    device="cuda",
-)
-
-results = evaluator.evaluate_all(
-    target_audio="./generated_wavs",
-    target_text=["你好世界", "这是一个测试"],
-    target_lang="zh",
-)
-
-print(results)
-```
-
-### Latency
-
-```python
-from multimetric_eval import GenericAgent, LatencyEvaluator, ReadAction, WriteAction
-
-
-class WaitUntilEndAgent(GenericAgent):
-    def policy(self, states=None):
-        states = states or self.states
-
-        if not states.source_finished:
-            return ReadAction()
-
-        if not states.target_finished:
-            prediction = "hello world"
-            self.record_model_inference_time(0.12)
-            return WriteAction(prediction, finished=True)
-
-        return ReadAction()
-
-
-agent = WaitUntilEndAgent()
-evaluator = LatencyEvaluator(agent, segment_size=20)
-```
-
-### Paralinguistics
-
-```python
-from multimetric_eval import ParalinguisticEvaluator
-
-evaluator = ParalinguisticEvaluator(
-    use_continuous_fidelity=True,
-    use_discrete_event_f1=True,
-    discrete_event_config={
-        "detector_backend": "panns",
-        "score_threshold": 0.3,
-    },
-    device="cuda",
-)
-
-results = evaluator.evaluate_all(
-    source_audio=["./src_wavs/sample_001.wav"],
-    target_audio=["./tgt_wavs/sample_001.wav"],
-    source_event_annotations=[
-        [
-            {"label": "laugh", "start_ms": 1200, "end_ms": 1850},
-            {"label": "cough", "start_ms": 4200, "end_ms": 4550},
-        ]
-    ],
-    event_label_mapping={
-        "Laughter": "laugh",
-        "Giggle": "laugh",
-        "Cough": "cough",
-    },
-)
-
-print(results)
-```
+- `examples/bash/install_extras.sh`
+- `examples/bash/run_latency_cli.sh`
 
 Latency output now distinguishes two RTF variants:
 
@@ -197,21 +111,11 @@ Latency output now distinguishes two RTF variants:
 
 ## Examples
 
-Examples have been moved into the `examples/` directory.
+Examples have been moved into the `examples/` directory. The paralinguistic examples above cover:
 
-### Python Examples
-
-- `examples/python/translation_eval.py`
-- `examples/python/speech_quality_eval.py`
-- `examples/python/speaker_similarity_eval.py`
-- `examples/python/emotion_eval.py`
-- `examples/python/paralinguistic_eval.py`
-- `examples/python/latency_eval.py`
-
-### Bash Examples
-
-- `examples/bash/install_extras.sh`
-- `examples/bash/run_latency_cli.sh`
+- strict event F1 with timestamped `source_event_annotations`
+- relaxed event F1 with utterance-level labels
+- identity-audio baselines for measuring the evaluator itself without a translation model
 
 ### Full Evaluation Pipelines
 
@@ -242,9 +146,12 @@ Common audio inputs support:
 - For `zh` / `ja` / `ko`, the toolkit uses CJK-aware handling for text-side evaluation.
 - `SpeechQualityEvaluator` returns `CER_Consistency` for `zh` / `ja` / `ko`, and `WER_Consistency` for most other languages.
 - `ParalinguisticEvaluator` reports `Paralinguistic_Fidelity_Cosine` through CLAP and can also report discrete event preservation with `Discrete_Acoustic_Event_F1_Strict` and `Discrete_Acoustic_Event_F1_Relaxed`.
-- The built-in discrete event detector currently uses a PANNs backend and requires the `paralinguistics` extra.
-- For discrete event F1, source-side event labels are expected to be canonical; `event_label_mapping` is applied on target-side detector labels so users can adapt different datasets or label ontologies.
-- Samples with no reference events and no predicted events are skipped for discrete event F1 aggregation.
+- `Discrete_Acoustic_Event_F1_Strict` requires timestamps on both source and target annotations. `Discrete_Acoustic_Event_F1_Relaxed` works with utterance-level labels.
+- If the source side has only utterance-level labels and no target-side annotations are provided, the evaluator falls back to `clap_label_matching`. In that branch only the relaxed metric is produced, and detector checkpoints are not used.
+- The built-in detector loads any `transformers` `AutoModelForAudioClassification` checkpoint that exposes `id2label`. Users can pass a local path or Hugging Face repo id through `beats_model_path` or `detector_model_path`; otherwise the evaluator tries BEATs-compatible defaults.
+- `allowed_labels` restricts both detector outputs and CLAP candidate labels.
+- For discrete event F1, source-side event labels are expected to be canonical. `event_label_mapping` is applied on target-side predicted labels so users can adapt different datasets or label ontologies.
+- Samples with no events or labels on both sides contribute zero counts to the aggregate instead of being treated as a special case.
 - In S2S latency evaluation, alignment prefers the model's native transcript when available. If the model is audio-only, the evaluator can optionally use ASR fallback to prepare alignment text.
 - For S2S forced alignment, pass language-appropriate MFA models through `alignment_acoustic_model` and `alignment_dictionary_model`. The defaults are English.
 - Some modules rely on optional dependencies or local model paths in offline environments.
