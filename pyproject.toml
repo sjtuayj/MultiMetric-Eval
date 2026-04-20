@@ -1,6 +1,6 @@
 [project]
 name = "multimetriceval"
-version = "0.8.2"  
+version = "0.8.3"  
 description = "Multi-metric evaluation toolkit supporting MT, ASR, TTS, SimulST, VC, and Paralinguistics with optimized CJK language support"
 readme = {file = "README.md", content-type = "text/markdown"}
 requires-python = ">=3.8"
@@ -30,7 +30,6 @@ dependencies = [
     "numpy",
     "sacrebleu>=2.0.0",
     "pandas",
-    "jiwer",
     "tqdm",
     "scipy",
     "soundfile",
@@ -49,6 +48,7 @@ Documentation = "https://github.com/sjtuayj/MultiMetric-Eval#readme"
 [project.optional-dependencies]
 comet = ["unbabel-comet>=2.2.2"]
 whisper = ["openai-whisper"]
+speech_quality = ["jiwer"]
 emotion = ["funasr", "modelscope"]  
-paralinguistics = ["librosa"]
-all = ["unbabel-comet>=2.2.2", "openai-whisper", "funasr", "modelscope", "librosa"]
+paralinguistics = ["transformers"]
+all = ["unbabel-comet>=2.2.2", "openai-whisper", "jiwer", "funasr", "modelscope", "transformers"]

@@ -2,7 +2,7 @@
 
 English | [中文](./README_zh.md)
 
-[![PyPI version](https://badge.fury.io/py/multimetriceval.svg)](https://pypi.org/project/multimetriceval/0.8.2/)
+[![PyPI version](https://badge.fury.io/py/multimetriceval.svg)](https://pypi.org/project/multimetriceval/0.8.3/)
 [![Python 3.8+](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
@@ -17,19 +17,6 @@ This project is best suited for these directions:
 - Streaming or simultaneous speech translation latency evaluation with a custom agent
 - Preservation analysis for speech translation outputs, including speaker similarity, emotion, and paralinguistic similarity
 
-## Capability Boundary
-
-MultiMetric-Eval is an evaluator, not a model training or inference framework.
-
-It is a good fit when you already have model outputs and want to score them in a consistent way.
-
-It is not designed to be:
-
-- a general-purpose ASR toolkit
-- a general-purpose TTS toolkit
-- a model serving framework
-- a replacement for task-specific toolkits in unrelated speech domains
-
 ## Core Modules
 
 | Module | Main Use | Typical Metrics |
@@ -38,7 +25,7 @@ It is not designed to be:
 | `SpeechQualityEvaluator` | Naturalness and text-speech consistency | `UTMOS`, `WER_Consistency`, `CER_Consistency` |
 | `SpeakerSimilarityEvaluator` | Speaker preservation | `wavlm_similarity`, `resemblyzer_similarity` |
 | `EmotionEvaluator` | Emotion preservation or classification accuracy | `Emotion2Vec_Cosine_Similarity`, `Audio_Emotion_Accuracy` |
-| `ParalinguisticEvaluator` | Non-verbal and paralinguistic similarity | `Paralinguistic_Fidelity_Cosine`, `Discrete_Acoustic_Event_F1_Strict`, `Discrete_Acoustic_Event_F1_Relaxed` |
+| `ParalinguisticEvaluator` | Non-verbal and paralinguistic preservation | `Paralinguistic_Fidelity_Cosine`, `Acoustic_Event_Preservation_Rate`, `Acoustic_Event_Preservation_Macro_F1`, `Acoustic_Event_Preservation_Macro_Recall` |
 | `LatencyEvaluator` | Streaming / simultaneous translation latency | `StartOffset`, `ATD`, `CustomATD`, `RTF`, `Model_Generate_RTF` |
 
 ## Installation
@@ -54,6 +41,7 @@ Optional extras:
 ```bash
 pip install "multimetriceval[comet]"
 pip install "multimetriceval[whisper]"
+pip install "multimetriceval[speech_quality]"
 pip install "multimetriceval[emotion]"
 pip install "multimetriceval[paralinguistics]"
 pip install "multimetriceval[all]"
@@ -111,20 +99,7 @@ Latency output now distinguishes two RTF variants:
 
 ## Examples
 
-Examples have been moved into the `examples/` directory. The paralinguistic examples above cover:
-
-- strict event F1 with timestamped `source_event_annotations`
-- relaxed event F1 with utterance-level labels
-- identity-audio baselines for measuring the evaluator itself without a translation model
-
-### Full Evaluation Pipelines
-
-For larger end-to-end evaluation scripts, see `test/`:
-
-- `test/run_full_eval_seamless.py`
-- `test/run_full_eval_vallex.py`
-- `test/run_full_eval_simulmega.py`
-- `test/run_full_eval_cascade.py`
+Examples have been moved into the `examples/` directory. 
 
 ## Input Conventions
 
@@ -145,13 +120,13 @@ Common audio inputs support:
 
 - For `zh` / `ja` / `ko`, the toolkit uses CJK-aware handling for text-side evaluation.
 - `SpeechQualityEvaluator` returns `CER_Consistency` for `zh` / `ja` / `ko`, and `WER_Consistency` for most other languages.
-- `ParalinguisticEvaluator` reports `Paralinguistic_Fidelity_Cosine` through CLAP and can also report discrete event preservation with `Discrete_Acoustic_Event_F1_Strict` and `Discrete_Acoustic_Event_F1_Relaxed`.
-- `Discrete_Acoustic_Event_F1_Strict` requires timestamps on both source and target annotations. `Discrete_Acoustic_Event_F1_Relaxed` works with utterance-level labels.
-- If the source side has only utterance-level labels and no target-side annotations are provided, the evaluator falls back to `clap_label_matching`. In that branch only the relaxed metric is produced, and detector checkpoints are not used.
-- The built-in detector loads any `transformers` `AutoModelForAudioClassification` checkpoint that exposes `id2label`. Users can pass a local path or Hugging Face repo id through `beats_model_path` or `detector_model_path`; otherwise the evaluator tries BEATs-compatible defaults.
-- `allowed_labels` restricts both detector outputs and CLAP candidate labels.
-- For discrete event F1, source-side event labels are expected to be canonical. `event_label_mapping` is applied on target-side predicted labels so users can adapt different datasets or label ontologies.
-- Samples with no events or labels on both sides contribute zero counts to the aggregate instead of being treated as a special case.
+- `ParalinguisticEvaluator` always supports `Paralinguistic_Fidelity_Cosine`, a continuous CLAP-based audio similarity score between source and target speech.
+- The discrete branch is now an utterance-level single-label preservation task. With source-side gold labels, it reports `Acoustic_Event_Preservation_Rate`, `Acoustic_Event_Preservation_Macro_F1`, and `Acoustic_Event_Preservation_Macro_Recall`.
+- The discrete branch does not use timestamps. It answers whether the source-side acoustic event is preserved somewhere in the target utterance, not whether it is aligned at the same time position.
+- If source-side gold labels are not available, the evaluator can still run in prediction-only mode and reports `Predicted_Event_Consistency_Rate`, `Predicted_Event_Consistency_Macro_F1`, and `Predicted_Event_Consistency_Macro_Recall`.
+- The default discrete predictor is a closed-set CLAP classifier over `candidate_labels`. Users may replace it with any custom predictor object that implements `predict(audio_paths, candidate_labels)`.
+- Dataset-specific label mapping is intentionally outside the core package. Pass `candidate_labels` and `label_normalizer` at call time so the same evaluator works across datasets without changing core code.
+- For offline environments, `clap_model_path` accepts either a Hugging Face repo id or a local model directory or snapshot.
 - In S2S latency evaluation, alignment prefers the model's native transcript when available. If the model is audio-only, the evaluator can optionally use ASR fallback to prepare alignment text.
 - For S2S forced alignment, pass language-appropriate MFA models through `alignment_acoustic_model` and `alignment_dictionary_model`. The defaults are English.
 - Some modules rely on optional dependencies or local model paths in offline environments.

@@ -1,71 +1,53 @@
 from multimetric_eval import ParalinguisticEvaluator
 
 
-def strict_event_demo():
-    evaluator = ParalinguisticEvaluator(
-        use_continuous_fidelity=True,
-        use_discrete_event_f1=True,
-        discrete_event_config={
-            "detector_model_path": "./model/BEATs/BEATs_iter3_plus_AS2M_finetuned_on_AS2M_cpt2.pt",
-            "score_threshold": 0.05,
-            "clap_label_score_threshold": 0.2,
-            "clap_label_fallback_top1": False,
-            "onset_tolerance_ms": 200,
-            "offset_tolerance_ms": 200,
-            "offset_tolerance_ratio": 0.2,
-            "allowed_labels": ["laughter", "coughing"],
-        },
-        device="cuda",
-    )
+LABEL_MAP = {
+    "laugh": "laughter",
+    "laughing": "laughter",
+    "laughter": "laughter",
+    "sigh": "sighing",
+    "sighing": "sighing",
+    "clear throat": "throat clearing",
+    "clearing throat": "throat clearing",
+    "throat clearing": "throat clearing",
+}
 
-    results, diagnostics = evaluator.evaluate_all(
-        source_audio=["./src_wavs/sample_001.wav"],
-        target_audio=["./tgt_wavs/sample_001.wav"],
-        source_event_annotations=[
-            [
-                {"label": "laughter", "start_ms": 1200, "end_ms": 1850},
-                {"label": "coughing", "start_ms": 4200, "end_ms": 4550},
-            ]
-        ],
-        event_label_mapping={
-            "Laughter": "laughter",
-            "Giggle": "laughter",
-            "Cough": "coughing",
-        },
-        return_diagnostics=True,
-    )
-
-    print("Strict event demo")
-    print(results)
-    print(diagnostics["discrete_event_metrics"]["prediction_source"])
+CANDIDATE_LABELS = [
+    "laughter",
+    "sighing",
+    "throat clearing",
+]
 
 
-def relaxed_label_demo():
-    evaluator = ParalinguisticEvaluator(
-        use_continuous_fidelity=True,
-        use_discrete_event_f1=True,
-        discrete_event_config={
-            "clap_label_score_threshold": 0.2,
-            "clap_label_fallback_top1": False,
-        },
-        device="cuda",
-    )
-
-    results, diagnostics = evaluator.evaluate_all(
-        source_audio=["./src_wavs/sample_002.wav"],
-        target_audio=["./tgt_wavs/sample_002.wav"],
-        source_utterance_annotations=[["throat clearing"]],
-        return_diagnostics=True,
-    )
-
-    print("Relaxed label demo")
-    print(results)
-    print(diagnostics["discrete_event_metrics"]["prediction_source"])
+def normalize_label(label: str):
+    normalized = " ".join(str(label).strip().lower().replace("_", " ").replace("-", " ").split())
+    return LABEL_MAP.get(normalized, normalized)
 
 
 def main():
-    strict_event_demo()
-    relaxed_label_demo()
+    evaluator = ParalinguisticEvaluator(
+        use_continuous_fidelity=True,
+        use_event_preservation=True,
+        clap_model_path="./model/clap-htsat-fused",  # Or "laion/clap-htsat-fused"
+        event_prediction_config={
+            "score_threshold": 0.2,
+            "fallback_top1": False,
+        },
+        device="cuda",
+    )
+
+    scores, diagnostics = evaluator.evaluate_all(
+        source_audio=["./src_wavs/sample_001.wav", "./src_wavs/sample_002.wav"],
+        target_audio=["./tgt_wavs/sample_001.wav", "./tgt_wavs/sample_002.wav"],
+        source_labels=["laugh", "throat clearing"],
+        candidate_labels=CANDIDATE_LABELS,
+        label_normalizer=normalize_label,
+        sample_ids=["sample_001", "sample_002"],
+        return_diagnostics=True,
+    )
+
+    print(scores)
+    print(diagnostics["event_preservation"]["per_label"])
 
 
 if __name__ == "__main__":
