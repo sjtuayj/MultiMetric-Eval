@@ -36,6 +36,8 @@ def main():
     samples = load_paralinguistic_samples(manifest_path)
     source_audio_paths = [sample.source_audio for sample in samples]
 
+    # This baseline only demonstrates preservation metrics. Alignment metrics
+    # are returned only if the loaded samples already contain source_onset_ms.
     scores, diagnostics = evaluate_paralinguistic_dataset(
         target_audio=source_audio_paths,
         samples=samples,

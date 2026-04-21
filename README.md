@@ -2,7 +2,7 @@
 
 English | [中文](./README_zh.md)
 
-[![PyPI version](https://badge.fury.io/py/multimetriceval.svg)](https://pypi.org/project/multimetriceval/0.8.3/)
+[![PyPI version](https://badge.fury.io/py/multimetriceval.svg)](https://pypi.org/project/multimetriceval/0.8.4/)
 [![Python 3.8+](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
@@ -25,7 +25,7 @@ This project is best suited for these directions:
 | `SpeechQualityEvaluator` | Naturalness and text-speech consistency | `UTMOS`, `WER_Consistency`, `CER_Consistency` |
 | `SpeakerSimilarityEvaluator` | Speaker preservation | `wavlm_similarity`, `resemblyzer_similarity` |
 | `EmotionEvaluator` | Emotion preservation or classification accuracy | `Emotion2Vec_Cosine_Similarity`, `Audio_Emotion_Accuracy` |
-| `ParalinguisticEvaluator` | Non-verbal and paralinguistic preservation | `Paralinguistic_Fidelity_Cosine`, `Acoustic_Event_Preservation_Rate`, `Acoustic_Event_Preservation_Macro_F1`, `Acoustic_Event_Preservation_Macro_Recall` |
+| `ParalinguisticEvaluator` | Non-verbal and paralinguistic preservation | `Paralinguistic_Fidelity_Cosine`, `Acoustic_Event_Preservation_Rate`, `Acoustic_Event_Preservation_Macro_F1`, `Acoustic_Event_Preservation_Macro_Recall`, `Event_Aligned_Preservation_Rate`, `Conditional_Relative_Onset_Error` |
 | `LatencyEvaluator` | Streaming / simultaneous translation latency | `StartOffset`, `ATD`, `CustomATD`, `RTF`, `Model_Generate_RTF` |
 
 ## Installation
@@ -121,10 +121,14 @@ Common audio inputs support:
 - For `zh` / `ja` / `ko`, the toolkit uses CJK-aware handling for text-side evaluation.
 - `SpeechQualityEvaluator` returns `CER_Consistency` for `zh` / `ja` / `ko`, and `WER_Consistency` for most other languages.
 - `ParalinguisticEvaluator` always supports `Paralinguistic_Fidelity_Cosine`, a continuous CLAP-based audio similarity score between source and target speech.
-- The discrete branch is now an utterance-level single-label preservation task. With source-side gold labels, it reports `Acoustic_Event_Preservation_Rate`, `Acoustic_Event_Preservation_Macro_F1`, and `Acoustic_Event_Preservation_Macro_Recall`.
-- The discrete branch does not use timestamps. It answers whether the source-side acoustic event is preserved somewhere in the target utterance, not whether it is aligned at the same time position.
+- The discrete preservation branch is an utterance-level single-label task. With source-side gold labels, it reports `Acoustic_Event_Preservation_Rate`, `Acoustic_Event_Preservation_Macro_F1`, and `Acoustic_Event_Preservation_Macro_Recall`.
+- If `source_onsets_ms` are available, the evaluator can also report alignment-aware metrics: `Event_Aligned_Preservation_Rate` and `Conditional_Relative_Onset_Error`.
+- Alignment is computed on relative onset position, not absolute wall-clock time. This makes it suitable for cross-lingual S2ST where source and target utterance durations naturally differ.
+- If target-side onset timestamps are not provided, the default localizer estimates them with CLAP sliding-window scoring conditioned on the target event label.
+- These alignment metrics should be interpreted as weak, coarse-grained alignment signals rather than timestamp-accurate event localization benchmarks.
 - If source-side gold labels are not available, the evaluator can still run in prediction-only mode and reports `Predicted_Event_Consistency_Rate`, `Predicted_Event_Consistency_Macro_F1`, and `Predicted_Event_Consistency_Macro_Recall`.
 - The default discrete predictor is a closed-set CLAP classifier over `candidate_labels`. Users may replace it with any custom predictor object that implements `predict(audio_paths, candidate_labels)`.
+- The default event localizer is also replaceable. Custom localizers only need to implement `localize(audio_paths, labels, candidate_labels)`.
 - Dataset-specific label mapping is intentionally outside the core package. Pass `candidate_labels` and `label_normalizer` at call time so the same evaluator works across datasets without changing core code.
 - For offline environments, `clap_model_path` accepts either a Hugging Face repo id or a local model directory or snapshot.
 - In S2S latency evaluation, alignment prefers the model's native transcript when available. If the model is audio-only, the evaluator can optionally use ASR fallback to prepare alignment text.

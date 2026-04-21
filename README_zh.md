@@ -2,7 +2,7 @@
 
 [English](./README.md) | 中文
 
-[![PyPI version](https://badge.fury.io/py/multimetriceval.svg)](https://pypi.org/project/multimetriceval/0.8.3/)
+[![PyPI version](https://badge.fury.io/py/multimetriceval.svg)](https://pypi.org/project/multimetriceval/0.8.4/)
 [![Python 3.8+](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
@@ -23,7 +23,7 @@ MultiMetric-Eval 是一个面向机器翻译和语音翻译的评测工具包，
 | `SpeechQualityEvaluator` | 自然度与语音文本一致性 | `UTMOS`, `WER_Consistency`, `CER_Consistency` |
 | `SpeakerSimilarityEvaluator` | 说话人保持 | `wavlm_similarity`, `resemblyzer_similarity` |
 | `EmotionEvaluator` | 情感保持或分类准确率 | `Emotion2Vec_Cosine_Similarity`, `Audio_Emotion_Accuracy` |
-| `ParalinguisticEvaluator` | 副语言与非言语声学事件保持 | `Paralinguistic_Fidelity_Cosine`, `Acoustic_Event_Preservation_Rate`, `Acoustic_Event_Preservation_Macro_F1`, `Acoustic_Event_Preservation_Macro_Recall` |
+| `ParalinguisticEvaluator` | 副语言与非言语声学事件保持 | `Paralinguistic_Fidelity_Cosine`, `Acoustic_Event_Preservation_Rate`, `Acoustic_Event_Preservation_Macro_F1`, `Acoustic_Event_Preservation_Macro_Recall`, `Event_Aligned_Preservation_Rate`, `Conditional_Relative_Onset_Error` |
 | `LatencyEvaluator` | 流式 / 同传延迟 | `StartOffset`, `ATD`, `CustomATD`, `RTF`, `Model_Generate_RTF` |
 
 ## 安装
@@ -110,13 +110,18 @@ from multimetric_eval import TranslationEvaluator, SpeechQualityEvaluator
   - `Acoustic_Event_Preservation_Rate`
   - `Acoustic_Event_Preservation_Macro_F1`
   - `Acoustic_Event_Preservation_Macro_Recall`
-- 当前离散指标不考虑时间戳。它评估的是目标语音里是否保留了该事件，而不是事件是否出现在同一时间位置。
+- 如果进一步提供 `source_onsets_ms`，则还可以输出带时间对齐约束的指标：
+  - `Event_Aligned_Preservation_Rate`
+  - `Conditional_Relative_Onset_Error`
+- 时间对齐使用相对起点位置，而不是绝对毫秒时间；这更适合跨语言 S2ST，因为源端和目标端时长往往不同。
+- 如果没有提供目标端时间戳，默认 localizer 会用基于 CLAP 的滑窗打分来估计目标事件位置。
+- 这些时间对齐指标应被理解为弱监督、粗粒度的对齐信号，而不是严格的高精度时间戳定位基准。
 - 如果没有源端金标签，也可以运行 prediction-only 模式，此时输出：
   - `Predicted_Event_Consistency_Rate`
   - `Predicted_Event_Consistency_Macro_F1`
   - `Predicted_Event_Consistency_Macro_Recall`
 - 默认离散预测器是基于 CLAP 的闭集分类器，候选集合由 `candidate_labels` 决定。
-- 你可以传入自定义 predictor，只要它实现 `predict(audio_paths, candidate_labels)` 接口即可，无需修改核心代码。
+- 你也可以传入自定义 predictor 和 localizer，只要它们分别实现 `predict(audio_paths, candidate_labels)` 和 `localize(audio_paths, labels, candidate_labels)` 接口即可，无需修改核心代码。
 - 数据集特定的标签映射不放进核心包。请在调用时通过 `candidate_labels` 和 `label_normalizer` 适配你的数据集。
 - `clap_model_path` 同时支持 Hugging Face repo id、本地模型目录和本地 snapshot 路径，适合离线环境。
 - S2S 延迟评测默认优先使用模型原生 transcript；纯语音模型可选 ASR fallback。
