@@ -135,6 +135,3 @@ Common audio inputs support:
 - For S2S forced alignment, pass language-appropriate MFA models through `alignment_acoustic_model` and `alignment_dictionary_model`. The defaults are English.
 - Some modules rely on optional dependencies or local model paths in offline environments.
 
-## License
-
-MIT License
