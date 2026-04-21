@@ -127,6 +127,3 @@ from multimetric_eval import TranslationEvaluator, SpeechQualityEvaluator
 - S2S 延迟评测默认优先使用模型原生 transcript；纯语音模型可选 ASR fallback。
 - 某些模块依赖可选依赖包或本地模型路径，离线环境下请自行准备。
 
-## License
-
-MIT License
